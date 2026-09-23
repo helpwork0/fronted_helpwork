@@ -1,140 +1,22 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import {
-  Home, FileText, MessageSquare, Inbox, Heart, Wallet, Bell, HelpCircle,
-  Briefcase, Calendar, Star, User, Settings, Sparkles,
-} from 'lucide-react'
 import { PublicLayout } from '@/components/layout/PublicLayout'
-import { DashboardLayout, type SidebarItem } from '@/components/layout/DashboardLayout'
-import { ROUTES } from '@/config/site.config'
 import { ScrollToTop } from './ScrollToTop'
 import { RutaPrivada } from './RutaPrivada'
+import { RutaRol } from './RutaRol'
+import { ROUTES } from '@/config/site.config'
 
-/* Carga diferida: cada página va en su propio chunk => arranque más rápido. */
-const HomePage       = lazy(() => import('@/features/marketing/pages/HomePage'))
-const PricingPage    = lazy(() => import('@/features/marketing/pages/PricingPage'))
-const LoginPage      = lazy(() => import('@/features/auth/pages/LoginPage'))
-const RegisterPage   = lazy(() => import('@/features/auth/pages/RegisterPage'))
-const RoleSelectPage = lazy(() => import('@/features/auth/pages/RoleSelectPage'))
-
-const SeekerHome     = lazy(() => import('@/features/dashboard/pages/SeekerHomePage'))
-const WorkerHome     = lazy(() => import('@/features/dashboard/pages/WorkerHomePage'))
-const MatchingPage   = lazy(() => import('@/features/dashboard/pages/MatchingPage'))
-const WorkerMatching = lazy(() => import('@/features/dashboard/pages/WorkerMatchingPage'))
-const RequestsPage   = lazy(() => import('@/features/dashboard/pages/RequestsPage'))
-const NewRequestPage = lazy(() => import('@/features/dashboard/pages/NewRequestPage'))
-const ProposalsPage  = lazy(() => import('@/features/dashboard/pages/ProposalsPage'))
-const FavoritesPage  = lazy(() => import('@/features/dashboard/pages/FavoritesPage'))
-const PaymentsPage   = lazy(() => import('@/features/dashboard/pages/PaymentsPage'))
-const NotifPage      = lazy(() => import('@/features/dashboard/pages/NotificationsPage'))
-const HelpPage       = lazy(() => import('@/features/dashboard/pages/HelpPage'))
-const OpportunitiesPage = lazy(() => import('@/features/dashboard/pages/OpportunitiesPage'))
-const JobsPage       = lazy(() => import('@/features/dashboard/pages/JobsPage'))
-const CalendarPage   = lazy(() => import('@/features/dashboard/pages/CalendarPage'))
-const ReviewsPage    = lazy(() => import('@/features/dashboard/pages/ReviewsPage'))
-const ProfilePage    = lazy(() => import('@/features/dashboard/pages/ProfilePage'))
-const SettingsPage   = lazy(() => import('@/features/dashboard/pages/SettingsPage'))
-const InboxPage      = lazy(() => import('@/features/messages/InboxPage'))
-
-const MENU_SOLICITANTE: SidebarItem[] = [
-  { label: 'Inicio', to: ROUTES.appSolicitante, icon: Home },
-  { label: 'Mis solicitudes', to: ROUTES.solicitudes, icon: FileText },
-  { label: 'Mensajes', to: ROUTES.mensajes, icon: MessageSquare },
-  { label: 'Propuestas', to: ROUTES.propuestas, icon: Inbox },
-  { label: 'Matching', to: ROUTES.matching, icon: Sparkles },
-  { label: 'Favoritos', to: ROUTES.favoritos, icon: Heart },
-  { label: 'Pagos', to: ROUTES.pagos, icon: Wallet },
-  { label: 'Notificaciones', to: ROUTES.notificaciones, icon: Bell, badge: 2 },
-  { label: 'Ajustes', to: ROUTES.ajustes, icon: Settings },
-  { label: 'Ayuda', to: ROUTES.ayuda, icon: HelpCircle },
-]
-
-const MENU_HELPWORKER: SidebarItem[] = [
-  { label: 'Inicio', to: ROUTES.appHelpWorker, icon: Home },
-  { label: 'Oportunidades', to: ROUTES.oportunidades, icon: Briefcase },
-  { label: 'Matching', to: ROUTES.matchingHW, icon: Sparkles },
-  { label: 'Mis trabajos', to: ROUTES.trabajos, icon: FileText },
-  { label: 'Mensajes', to: ROUTES.mensajes, icon: MessageSquare },
-  { label: 'Calendario', to: ROUTES.calendario, icon: Calendar },
-  { label: 'Ganancias', to: ROUTES.ganancias, icon: Wallet },
-  { label: 'Reseñas', to: ROUTES.resenas, icon: Star },
-  { label: 'Perfil público', to: ROUTES.perfil, icon: User },
-  { label: 'Ajustes', to: ROUTES.ajustes, icon: Settings },
-  { label: 'Ayuda', to: ROUTES.ayuda, icon: HelpCircle },
-]
-
-const USUARIO_SOLICITANTE = { nombre: 'Ariana López', subtitulo: 'Solicitante verificado', avatarUrl: 'https://i.pravatar.cc/120?u=ariana' }
-const USUARIO_HELPWORKER  = { nombre: 'Joaquín Quintero', subtitulo: 'HelpWorker · Plan Pro', avatarUrl: 'https://i.pravatar.cc/120?u=joaquin' }
-
-const Cargando = () => (
-  <div className="grid min-h-[60vh] place-items-center">
-    <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" />
-  </div>
-)
-
+const Home = lazy(() => import('@/features/marketing/pages/HomePage')); const Pricing = lazy(() => import('@/features/marketing/pages/PricingPage')); const Login = lazy(() => import('@/features/auth/pages/LoginPage')); const Register = lazy(() => import('@/features/auth/pages/RegisterPage')); const Role = lazy(() => import('@/features/auth/pages/RoleSelectPage')); const Callback = lazy(() => import('@/features/auth/pages/AuthCallbackPage'))
+const SolicitanteLayout = lazy(() => import('@/features/solicitante/layout/SolicitanteLayout')); const ProveedorLayout = lazy(() => import('@/features/proveedor/layout/ProveedorLayout')); const AdministradorLayout = lazy(() => import('@/features/administrador/layout/AdministradorLayout'))
+const SeekerHome = lazy(() => import('@/features/dashboard/pages/SeekerHomePage')); const Requests = lazy(() => import('@/features/dashboard/pages/RequestsPage')); const NewRequest = lazy(() => import('@/features/dashboard/pages/NewRequestPage')); const Matching = lazy(() => import('@/features/dashboard/pages/MatchingPage')); const Calendar = lazy(() => import('@/features/dashboard/pages/CalendarPage')); const Reviews = lazy(() => import('@/features/dashboard/pages/ReviewsPage')); const RequesterProfile = lazy(() => import('@/features/dashboard/pages/RequesterProfilePage')); const Proposals = lazy(() => import('@/features/dashboard/pages/ProposalsPage')); const Favorites = lazy(() => import('@/features/dashboard/pages/FavoritesPage')); const Notifications = lazy(() => import('@/features/dashboard/pages/NotificationsPage')); const Settings = lazy(() => import('@/features/dashboard/pages/SettingsPage')); const Help = lazy(() => import('@/features/dashboard/pages/HelpPage')); const Inbox = lazy(() => import('@/features/messages/InboxPage')); const Payments = lazy(() => import('@/features/dashboard/pages/PaymentsPage'))
+const WorkerHome = lazy(() => import('@/features/dashboard/pages/WorkerHomePage')); const WorkerMatching = lazy(() => import('@/features/dashboard/pages/WorkerMatchingPage')); const Opportunities = lazy(() => import('@/features/dashboard/pages/OpportunitiesPage')); const Jobs = lazy(() => import('@/features/dashboard/pages/JobsPage')); const WorkerProfile = lazy(() => import('@/features/dashboard/pages/ProfilePage')); const ProviderRequests = lazy(() => import('@/features/proveedor/solicitante/ProveedorSolicitudesPage')); const ProviderNewRequest = lazy(() => import('@/features/proveedor/solicitante/ProveedorNuevaSolicitudPage')); const ProviderMatching = lazy(() => import('@/features/proveedor/solicitante/ProveedorMatchingSolicitudesPage'))
+const loader = <div className="grid min-h-[60vh] place-items-center"><div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /></div>
+const privateRole = (role: 'solicitante' | 'helpworker' | 'administrador', layout: React.ReactNode) => <RutaPrivada><RutaRol rol={role}>{layout}</RutaRol></RutaPrivada>
 const router = createBrowserRouter([
-  {
-    element: <><ScrollToTop /><PublicLayout /></>,
-    children: [
-      { path: ROUTES.home, element: <HomePage /> },
-      { path: ROUTES.precios, element: <PricingPage /> },
-      { path: ROUTES.login, element: <LoginPage /> },
-      { path: ROUTES.registro, element: <RegisterPage /> },
-      { path: ROUTES.registroRol, element: <RoleSelectPage /> },
-    ],
-  },
-  {
-    // Zona del solicitante
-    element: (
-      <RutaPrivada>
-        <ScrollToTop />
-        <DashboardLayout items={MENU_SOLICITANTE} usuario={USUARIO_SOLICITANTE} />
-      </RutaPrivada>
-    ),
-    children: [
-      { path: ROUTES.appSolicitante, element: <SeekerHome /> },
-      { path: ROUTES.solicitudes, element: <RequestsPage /> },
-      { path: ROUTES.nuevaSolicitud, element: <NewRequestPage /> },
-      { path: ROUTES.propuestas, element: <ProposalsPage /> },
-      { path: ROUTES.matching, element: <MatchingPage /> },
-      { path: ROUTES.favoritos, element: <FavoritesPage /> },
-      { path: ROUTES.pagos, element: <PaymentsPage /> },
-      { path: ROUTES.mensajes, element: <InboxPage /> },
-      { path: ROUTES.notificaciones, element: <NotifPage /> },
-      { path: ROUTES.ajustes, element: <SettingsPage /> },
-      { path: ROUTES.ayuda, element: <HelpPage /> },
-    ],
-  },
-  {
-    // Zona del HelpWorker
-    element: (
-      <RutaPrivada>
-        <ScrollToTop />
-        <DashboardLayout items={MENU_HELPWORKER} usuario={USUARIO_HELPWORKER} />
-      </RutaPrivada>
-    ),
-    children: [
-      { path: ROUTES.appHelpWorker, element: <WorkerHome /> },
-      { path: ROUTES.oportunidades, element: <OpportunitiesPage /> },
-      { path: ROUTES.trabajos, element: <JobsPage /> },
-      { path: ROUTES.calendario, element: <CalendarPage /> },
-      { path: ROUTES.resenas, element: <ReviewsPage /> },
-      { path: ROUTES.perfil, element: <ProfilePage /> },
-      { path: ROUTES.ganancias, element: <PaymentsPage modo="helpworker" /> },
-      { path: ROUTES.matchingHW, element: <WorkerMatching /> },
-      { path: ROUTES.mensajes, element: <InboxPage /> },
-      { path: ROUTES.notificaciones, element: <NotifPage /> },
-      { path: ROUTES.ajustes, element: <SettingsPage /> },
-      { path: ROUTES.ayuda, element: <HelpPage /> },
-    ],
-  },
+  { element: <><ScrollToTop /><PublicLayout /></>, children: [{ path: ROUTES.home, element: <Home /> }, { path: ROUTES.precios, element: <Pricing /> }, { path: ROUTES.login, element: <Login /> }, { path: ROUTES.registro, element: <Register /> }, { path: ROUTES.registroRol, element: <Role /> }, { path: ROUTES.authCallback, element: <Callback /> }] },
+  { element: privateRole('solicitante', <SolicitanteLayout />), children: [{ path: ROUTES.appSolicitante, element: <SeekerHome /> }, { path: ROUTES.solicitudes, element: <Requests /> }, { path: ROUTES.nuevaSolicitud, element: <NewRequest /> }, { path: ROUTES.matching, element: <Matching /> }, { path: ROUTES.calendarioSolicitante, element: <Calendar /> }, { path: ROUTES.resenasSolicitante, element: <Reviews modo="solicitante" /> }, { path: ROUTES.perfilSolicitante, element: <RequesterProfile /> }, { path: ROUTES.propuestas, element: <Proposals /> }, { path: ROUTES.favoritos, element: <Favorites /> }, { path: ROUTES.notificacionesSolicitante, element: <Notifications /> }, { path: ROUTES.ajustesSolicitante, element: <Settings /> }, { path: ROUTES.ayudaSolicitante, element: <Help /> }, { path: ROUTES.mensajesSolicitante, element: <Inbox /> }, { path: ROUTES.pagos, element: <Payments /> }] },
+  { element: privateRole('helpworker', <ProveedorLayout />), children: [{ path: ROUTES.appHelpWorker, element: <WorkerHome /> }, { path: ROUTES.matchingHW, element: <WorkerMatching /> }, { path: ROUTES.oportunidades, element: <Opportunities /> }, { path: ROUTES.trabajos, element: <Jobs /> }, { path: ROUTES.calendario, element: <Calendar /> }, { path: ROUTES.resenas, element: <Reviews /> }, { path: ROUTES.perfil, element: <WorkerProfile /> }, { path: ROUTES.ganancias, element: <Payments modo="helpworker" /> }, { path: ROUTES.mensajes, element: <Inbox /> }, { path: ROUTES.notificaciones, element: <Notifications /> }, { path: ROUTES.ajustes, element: <Settings /> }, { path: ROUTES.ayuda, element: <Help /> }, { path: ROUTES.proveedorSolicitudes, element: <ProviderRequests /> }, { path: ROUTES.proveedorNuevaSolicitud, element: <ProviderNewRequest /> }, { path: ROUTES.proveedorMatchingSolicitudes, element: <ProviderMatching /> }, { path: ROUTES.proveedorPropuestas, element: <Proposals /> }, { path: ROUTES.proveedorFavoritos, element: <Favorites /> }] },
+  { element: privateRole('administrador', <AdministradorLayout />), children: [{ path: ROUTES.appAdministrador, element: <div className="panel p-6"><h1 className="text-xl font-bold">Panel administrativo</h1><p className="mt-2 texto-suave">Estructura de rutas y sidebar preparada. Los módulos administrativos se conectarán después.</p></div> }] },
   { path: '*', element: <div className="grid min-h-screen place-items-center text-ink-muted">404 — Página no encontrada</div> },
 ])
-
-export function AppRouter() {
-  return (
-    <Suspense fallback={<Cargando />}>
-      <RouterProvider router={router} />
-    </Suspense>
-  )
-}
+export function AppRouter() { return <Suspense fallback={loader}><RouterProvider router={router} /></Suspense> }

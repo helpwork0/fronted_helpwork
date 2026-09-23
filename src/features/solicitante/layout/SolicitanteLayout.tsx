@@ -1,0 +1,11 @@
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Bell, Calendar, FileText, Heart, HelpCircle, Home, Inbox, MessageSquare, Settings, Sparkles, Star, User } from 'lucide-react'
+import { Logo } from '@/components/layout/Logo'
+import { UserMenu } from '@/components/layout/UserMenu'
+import { useAuth } from '@/features/auth/AuthContext'
+import { ROUTES } from '@/config/site.config'
+import { cn } from '@/lib/cn'
+import { AppBar } from '@/components/layout/AppBar'
+const links = [{ l: 'Inicio', to: ROUTES.appSolicitante, i: Home }, { l: 'Mis solicitudes', to: ROUTES.solicitudes, i: FileText }, { l: 'Matching', to: ROUTES.matching, i: Sparkles }, { l: 'Propuestas', to: ROUTES.propuestas, i: Inbox }, { l: 'Favoritos', to: ROUTES.favoritos, i: Heart }, { l: 'Calendario', to: ROUTES.calendarioSolicitante, i: Calendar }, { l: 'Reseñas', to: ROUTES.resenasSolicitante, i: Star }, { l: 'Perfil público', to: ROUTES.perfilSolicitante, i: User }, { l: 'Mensajes', to: ROUTES.mensajesSolicitante, i: MessageSquare }, { l: 'Notificaciones', to: ROUTES.notificacionesSolicitante, i: Bell }, { l: 'Ajustes', to: ROUTES.ajustesSolicitante, i: Settings }, { l: 'Ayuda', to: ROUTES.ayudaSolicitante, i: HelpCircle }]
+/** Sidebar exclusivo del solicitante: no contiene enlaces ni lógica de HelpWorker. */
+export default function SolicitanteLayout() { const { pathname } = useLocation(); const { usuario } = useAuth(); return <div className="ambiente min-h-screen"><aside className="fixed inset-y-0 left-0 hidden w-[264px] flex-col border-r border-white/70 bg-white/75 backdrop-blur-2xl lg:flex"><div className="px-5 py-6"><Logo /></div><nav className="flex-1 space-y-1 overflow-y-auto px-3">{links.map(({ l, to, i: Icon }) => <NavLink key={to} to={to} className={cn('flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14.5px] font-medium', pathname === to ? 'bg-brand-50 text-brand-700' : 'text-ink-soft hover:bg-brand-50/70')}><Icon size={18} />{l}</NavLink>)}</nav><div className="border-t border-surface-line p-2"><UserMenu nombre={usuario?.nombre ?? 'HelpSeeker'} subtitulo="Solicitante" avatarUrl={usuario?.avatarUrl ?? ''} /></div></aside><main className="lg:pl-[264px]"><AppBar notificationsTo={ROUTES.notificacionesSolicitante} /><div className="px-5 py-7 sm:px-8"><Outlet /></div></main></div> }

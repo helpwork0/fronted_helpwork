@@ -25,7 +25,7 @@ export function ProgressRing({
           transition={{ duration: 1.2, ease: 'easeOut', delay: 0.2 }}
         />
       </svg>
-      <span className="absolute inset-0 grid place-items-center text-[13px] font-extrabold">
+      <span className="absolute inset-0 grid place-items-center text-[13px] font-extrabold" style={{ color }}>
         {valor}%
       </span>
     </div>

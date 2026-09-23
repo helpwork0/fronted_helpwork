@@ -162,7 +162,7 @@ export default function WorkerHomePage() {
           gente={HELPSEEKERS_ACTIVOS}
           textoBoton="Proponer"
           onAccion={() => abrirChat('cv1')}
-          verTodos={ROUTES.matchingHW}
+          verTodos={ROUTES.oportunidades}
         />
       </motion.div>
 

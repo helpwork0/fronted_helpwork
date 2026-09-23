@@ -1,0 +1,10 @@
+import { useEffect, useState } from 'react'
+import { CalendarClock, Plus, Trash2 } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import type { ApiTask } from '@/lib/api/helpwork.types'
+/** Calendario independiente de la faceta solicitante del proveedor. */
+export default function ProveedorCalendarioSolicitantePage() { const [tasks, setTasks] = useState<ApiTask[]>([]); const [title, setTitle] = useState(''); const [when, setWhen] = useState(''); const load = () => http.get<ApiTask[]>(ENDPOINTS.tareas.list).then(setTasks); useEffect(() => { load(); const timer = window.setInterval(load, 15000); return () => window.clearInterval(timer) }, []); const save = async () => { if (!title || !when) return; await http.post(ENDPOINTS.tareas.create, { title, taskType: 'reminder', scheduledFor: new Date(when).toISOString() }); setTitle(''); setWhen(''); load() }; return <div className="mx-auto max-w-3xl"><PageHeader titulo="Calendario personal" descripcion="Recordatorios de tu faceta HelpSeeker." /><div className="panel mb-5 flex flex-wrap gap-3 p-4"><Input label="Recordatorio" value={title} onChange={e => setTitle(e.target.value)} /><Input label="Fecha" type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} /><Button onClick={() => save().catch(() => undefined)}><Plus size={15} /> Programar</Button></div><div className="grid gap-3">{tasks.map(task => <article key={task.id} className="panel flex items-center gap-3 p-4"><CalendarClock size={18} className="text-brand-600" /><div className="flex-1"><b>{task.title}</b><p className="text-xs texto-suave">{task.status} · {new Date(task.scheduled_for).toLocaleString('es-EC')}</p></div><button onClick={() => http.del(ENDPOINTS.tareas.remove(task.id)).then(load)} className="text-red-600"><Trash2 size={16} /></button></article>)}</div></div> }

@@ -3,13 +3,14 @@
    los que debe devolver la API (así no cambias los componentes).
 ------------------------------------------------------------------- */
 
-export type UserRole = 'solicitante' | 'helpworker'
+export type UserRole = 'solicitante' | 'helpworker' | 'administrador'
 
 export interface User {
   id: string
   nombre: string
   email: string
   rol: UserRole
+  roles: UserRole[]
   avatarUrl?: string
   verificado: boolean
 }

@@ -1,16 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Bell, Globe, Lock, RefreshCw, Trash2, UserCog } from 'lucide-react'
+import { Bell, Globe, Lock, RefreshCw, Trash2, UserCog, UserPlus, UserMinus } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/AuthContext'
 import { reiniciarGuias } from '@/components/onboarding/useAutoTour'
 import { cn } from '@/lib/cn'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import type { ApiBlock } from '@/lib/api/helpwork.types'
 
 export default function SettingsPage() {
-  const { usuario } = useAuth()
-  const [avisos, setAvisos] = useState({ correo: true, whatsapp: true, propuestas: true, mensajes: true, resumen: false })
+  const { usuario, refrescarSesion } = useAuth()
+  const [avisos, setAvisos] = useState({ correo: true, propuestas: true, mensajes: true, resumen: false })
+  const [blocks, setBlocks] = useState<ApiBlock[]>([])
+  const [blockedId, setBlockedId] = useState('')
+  const [blockReason, setBlockReason] = useState('')
+  const cargarBloqueos = () => http.get<ApiBlock[]>(ENDPOINTS.moderacion.bloqueosMios).then(setBlocks).catch(() => setBlocks([]))
+  useEffect(() => { void cargarBloqueos() }, [])
+  const bloquear = async () => { if (!blockedId.trim()) return; await http.post(ENDPOINTS.moderacion.bloquear, { blockedId: blockedId.trim(), reason: blockReason || undefined }); setBlockedId(''); setBlockReason(''); cargarBloqueos() }
+  const desbloquear = async (id: string) => { await http.del(ENDPOINTS.moderacion.desbloquear(id)); cargarBloqueos() }
+  const modoSolicitanteActivo = usuario?.roles.includes('solicitante') ?? false
+  const cambiarModoSolicitante = async () => { await http.patch(ENDPOINTS.usuarios.modoSolicitante, { enabled: !modoSolicitanteActivo }); await refrescarSesion() }
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -24,14 +36,13 @@ export default function SettingsPage() {
           <Input label="Ciudad" defaultValue="Loja, Ecuador" />
         </div>
         <Button size="sm" className="mt-4">Guardar</Button>
+        {usuario?.rol === 'helpworker' && <div className="mt-5 rounded-xl border border-brand-100 bg-brand-50/70 p-4"><p className="text-[14px] font-semibold text-brand-700">Modo HelpSeeker</p><p className="mt-1 text-[12.5px] texto-suave">{modoSolicitanteActivo ? 'Está activo: puedes publicar solicitudes y ver proveedores compatibles.' : 'Está desactivado: tus opciones de solicitante permanecen bloqueadas.'} No modifica ni concede permisos de HelpWorker.</p><Button size="sm" className="mt-3" onClick={() => cambiarModoSolicitante().catch(() => undefined)}>{modoSolicitanteActivo ? <><UserMinus size={14} /> Desactivar rol solicitante</> : <><UserPlus size={14} /> Activar rol solicitante</>}</Button></div>}
       </Bloque>
 
       <Bloque icon={Bell} titulo="Notificaciones">
         <div className="space-y-1">
           <Interruptor label="Avisos por correo" descripcion="Resumen de lo importante en tu bandeja"
             activo={avisos.correo} onChange={v => setAvisos({ ...avisos, correo: v })} />
-          <Interruptor label="Avisos por WhatsApp" descripcion="Para lo urgente, como propuestas nuevas"
-            activo={avisos.whatsapp} onChange={v => setAvisos({ ...avisos, whatsapp: v })} />
           <Interruptor label="Propuestas recibidas" descripcion="Cada vez que alguien responde a tu solicitud"
             activo={avisos.propuestas} onChange={v => setAvisos({ ...avisos, propuestas: v })} />
           <Interruptor label="Mensajes nuevos" descripcion="Cuando te escriben por el chat"
@@ -71,6 +82,12 @@ export default function SettingsPage() {
           <Input label="Contraseña nueva" type="password" placeholder="••••••••" />
         </div>
         <Button size="sm" className="mt-4">Cambiar contraseña</Button>
+      </Bloque>
+
+      <Bloque icon={UserCog} titulo="Bloqueos y moderación">
+        <p className="mb-4 text-[13.5px] texto-suave">Una persona bloqueada no volverá a aparecer en tus resultados de matching.</p>
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><Input label="ID del usuario" value={blockedId} onChange={event => setBlockedId(event.target.value)} placeholder="UUID del perfil" /><Input label="Motivo opcional" value={blockReason} onChange={event => setBlockReason(event.target.value)} placeholder="Motivo" /><Button size="sm" className="self-end" onClick={() => bloquear().catch(() => undefined)}>Bloquear</Button></div>
+        <div className="mt-4 space-y-2">{blocks.length ? blocks.map(block => <div key={block.blocked_id} className="flex items-center gap-3 rounded-xl bg-white/60 p-3"><span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{block.users?.full_name ?? block.blocked_id}</span><button onClick={() => desbloquear(block.blocked_id).catch(() => undefined)} className="text-[12.5px] font-semibold text-red-600">Desbloquear</button></div>) : <p className="text-[13px] texto-suave">No tienes usuarios bloqueados.</p>}</div>
       </Bloque>
 
       <Bloque icon={Trash2} titulo="Zona sensible" peligro>

@@ -18,7 +18,7 @@ const PASOS = ['Cuenta', 'Detalles', 'Confirmar'] as const
 export default function RegisterPage() {
   const [paso, setPaso] = useState(0)
   const [acepta, setAcepta] = useState(false)
-  const [datos, setDatos] = useState({ nombre: '', email: '' })
+  const [datos, setDatos] = useState({ nombre: '', email: '', password: '', confirmarPassword: '' })
   const navigate = useNavigate()
   const { registrar } = useAuth()
   useAutoTour('registro')
@@ -27,15 +27,18 @@ export default function RegisterPage() {
   const { state } = useLocation() as { state?: { rol?: UserRole } }
   const rol: UserRole = state?.rol ?? 'solicitante'
 
-  const siguiente = (e: React.FormEvent) => {
+  const [error, setError] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const siguiente = async (e: React.FormEvent) => {
     e.preventDefault()
     if (paso < PASOS.length - 1) { setPaso(p => p + 1); return }
-
-    // TODO backend:  await http.post(ENDPOINTS.auth.register, { ...datos, rol })
-    // Crear la cuenta es lo único que marca `esCuentaNueva`: por eso las
-    // guías del panel corren aquí y no al iniciar sesión más adelante.
-    registrar({ nombre: datos.nombre || 'Nueva persona', email: datos.email, rol })
-    navigate(rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante, { replace: true })
+    if (datos.password !== datos.confirmarPassword) { setPaso(0); setError('Las contraseñas no coinciden.'); return }
+    setError(''); setEnviando(true)
+    try {
+      const result = await registrar({ nombre: datos.nombre, email: datos.email, password: datos.password, rol })
+      if (result.emailConfirmationRequired) { setError('Revisa tu correo y confirma la cuenta antes de iniciar sesión.'); setPaso(0); return }
+      navigate(result.sesion?.rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante, { replace: true })
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo crear la cuenta.'); setPaso(0) } finally { setEnviando(false) }
   }
 
   return (
@@ -97,8 +100,8 @@ export default function RegisterPage() {
               label="Correo electrónico" type="email" placeholder="tucorreo@ejemplo.com" required
               value={datos.email} onChange={e => setDatos({ ...datos, email: e.target.value })}
             />
-            <Input label="Contraseña" type="password" placeholder="••••••••••" required />
-            <Input label="Confirmar contraseña" type="password" placeholder="••••••••••" required />
+            <Input label="Contraseña" type="password" placeholder="••••••••••" required value={datos.password} onChange={e => setDatos({ ...datos, password: e.target.value })} />
+            <Input label="Confirmar contraseña" type="password" placeholder="••••••••••" required value={datos.confirmarPassword} onChange={e => setDatos({ ...datos, confirmarPassword: e.target.value })} />
 
             <label data-tour="registro-terminos" className="flex items-start gap-2.5 text-[13.5px] leading-snug text-ink-soft">
               <input
@@ -130,9 +133,10 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <Button data-tour="registro-continuar" type="submit" size="lg" fullWidth disabled={paso === 0 && !acepta}>
-          {paso === PASOS.length - 1 ? 'Crear cuenta' : 'Continuar'}
+        <Button data-tour="registro-continuar" type="submit" size="lg" fullWidth disabled={(paso === 0 && !acepta) || enviando}>
+          {enviando ? 'Creando cuenta…' : paso === PASOS.length - 1 ? 'Crear cuenta' : 'Continuar'}
         </Button>
+        {error && <p className="text-center text-[13px] text-red-600">{error}</p>}
       </form>
 
       <p className="mt-5 text-center text-[14.5px] text-ink-soft">

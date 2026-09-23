@@ -16,7 +16,7 @@ import { cn } from '@/lib/cn'
 export default function InboxPage() {
   const { conversaciones, abrirChat, enviar } = useMessages()
   const { usuario } = useAuth()
-  const otros = contraparte(usuario?.rol ?? 'solicitante')
+  const otros = contraparte(usuario?.rol === 'helpworker' ? 'helpworker' : 'solicitante')
   const [activa, setActiva] = useState<string | null>(conversaciones[0]?.id ?? null)
   const [busqueda, setBusqueda] = useState('')
   const [texto, setTexto] = useState('')

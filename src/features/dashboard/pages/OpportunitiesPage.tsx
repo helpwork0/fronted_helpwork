@@ -1,90 +1,64 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Search, MapPin, Clock, SlidersHorizontal } from 'lucide-react'
+import { CalendarClock, MapPin, Search, Send, UserRound } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Tabs } from '@/components/ui/Tabs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { AnimatedNumber } from '../components/AnimatedNumber'
-import { OPORTUNIDADES } from '@/data/mock'
-import type { Opportunity } from '@/types'
 import { staggerContainer, fadeUp } from '@/lib/motion/variants'
+import { useAuth } from '@/features/auth/AuthContext'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import type { ApiProviderOpportunity } from '@/lib/api/helpwork.types'
 
-const MAS: Opportunity[] = [
-  { id: 'o4', titulo: 'Tutoría de Álgebra Lineal', categoria: 'Estudios y Tutorías', modalidad: 'En línea', publicadoHace: 'hace 6 h', precio: 14, unidad: 'hora', match: 88, avatarUrl: 'https://i.pravatar.cc/120?u=op4' },
-  { id: 'o5', titulo: 'Revisión de tesis en APA', categoria: 'Redacción', modalidad: 'Remoto', publicadoHace: 'hace 1 d', precio: 120, unidad: 'proyecto', match: 81, avatarUrl: 'https://i.pravatar.cc/120?u=op5' },
-  { id: 'o6', titulo: 'Clases de Python básico', categoria: 'Programación', modalidad: 'En línea', publicadoHace: 'hace 2 d', precio: 16, unidad: 'hora', match: 76, avatarUrl: 'https://i.pravatar.cc/120?u=op6' },
-]
-const TODAS: Opportunity[] = [...OPORTUNIDADES, ...MAS]
+const estadosActivos = new Set(['assigned', 'shown', 'opened', 'contacted'])
+const textoEstado: Record<string, string> = { assigned: 'Nueva', shown: 'Nueva', opened: 'Abierta', contacted: 'Contactada', accepted: 'Aceptada', rejected: 'Rechazada', expired: 'Vencida' }
+const estaVencida = (item: ApiProviderOpportunity) => item.service_requests?.status === 'expired' || Boolean(item.service_requests?.expires_at && new Date(item.service_requests.expires_at).getTime() <= Date.now())
+const limite = (value?: string | null) => value ? new Intl.DateTimeFormat('es-EC', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Guayaquil' }).format(new Date(value)) : 'Sin fecha límite'
 
+/** Bandeja real del HelpWorker: son asignaciones que produjo el motor, no solicitudes mock. */
 export default function OpportunitiesPage() {
-  const [tab, setTab] = useState('recomendadas')
+  const { usuario } = useAuth()
+  const [items, setItems] = useState<ApiProviderOpportunity[]>([])
+  const [tab, setTab] = useState('activas')
   const [q, setQ] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  const base = tab === 'recomendadas' ? TODAS.filter(o => o.match >= 85)
-    : tab === 'urgentes' ? TODAS.filter(o => o.urgente)
-    : TODAS
-  const lista = base.filter(o => o.titulo.toLowerCase().includes(q.toLowerCase()))
+  const cargar = () => {
+    if (!usuario) return
+    setLoading(true)
+    http.get<ApiProviderOpportunity[]>(ENDPOINTS.recomendaciones.proveedor(usuario.id)).then(setItems).finally(() => setLoading(false))
+  }
+  useEffect(cargar, [usuario?.id])
+  const esActiva = (item: ApiProviderOpportunity) => estadosActivos.has(item.status) && !estaVencida(item)
+  const base = tab === 'activas' ? items.filter(esActiva) : tab === 'cerradas' ? items.filter(item => !esActiva(item)) : items
+  const lista = useMemo(() => base.filter(item => `${item.requester?.full_name} ${item.service_requests?.description_free} ${item.service_requests?.field_code} ${item.service_requests?.service_type_code}`.toLowerCase().includes(q.toLowerCase())), [base, q])
+  const avanzar = async (item: ApiProviderOpportunity) => {
+    // Consultar una oportunidad no debe marcarla como “vista”; el primer cambio útil es abrirla.
+    const siguiente = item.status === 'assigned' || item.status === 'shown' ? 'opened' : 'contacted'
+    await http.patch(ENDPOINTS.recomendaciones.estado(item.id), { status: siguiente })
+    cargar()
+  }
 
-  return (
-    <div>
-      <PageHeader titulo="Oportunidades" descripcion="Trabajos publicados que encajan con tu perfil.">
-        <Button variant="secondary" size="sm"><SlidersHorizontal size={15} /> Filtros</Button>
-      </PageHeader>
-
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs activa={tab} onChange={setTab} tabs={[
-          { id: 'recomendadas', label: 'Recomendadas', contador: TODAS.filter(o => o.match >= 85).length },
-          { id: 'urgentes', label: 'Urgentes', contador: TODAS.filter(o => o.urgente).length },
-          { id: 'todas', label: 'Todas', contador: TODAS.length },
-        ]} />
-        <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-4 py-2 backdrop-blur-xl sm:w-72">
-          <Search size={15} className="shrink-0 text-ink-muted" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar oportunidad"
-            className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-muted/80" />
-        </div>
-      </div>
-
-      {lista.length === 0 ? (
-        <div className="panel"><EmptyState titulo="Nada por ahora" texto="No hay oportunidades que coincidan. Prueba ampliando tus habilidades en el perfil." /></div>
-      ) : (
-        <motion.div variants={staggerContainer(0.07)} initial="hidden" animate="show" className="grid gap-3">
-          {lista.map((o, i) => (
-            <motion.article key={o.id} variants={fadeUp} className="panel panel-hover flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
-              <img src={o.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-[16px] font-bold">{o.titulo}</h3>
-                  {o.urgente && <Badge tone="amber">Urgente</Badge>}
-                </div>
-                <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] texto-suave">
-                  <span className="inline-flex items-center gap-1"><MapPin size={12} /> {o.modalidad}</span>
-                  <span>{o.categoria}</span>
-                  <span className="inline-flex items-center gap-1"><Clock size={12} /> {o.publicadoHace}</span>
-                </div>
-              </div>
-
-              <p className="shrink-0 text-[16px] font-bold">
-                ${o.precio}<span className="text-[12.5px] font-normal text-ink-muted"> / {o.unidad}</span>
-              </p>
-
-              <div className="shrink-0 text-center">
-                <p className="text-[17px] font-extrabold text-success-500">
-                  <AnimatedNumber valor={o.match} sufijo="%" duracion={800 + i * 120} />
-                </p>
-                <p className="text-[11px] text-ink-muted">match</p>
-              </div>
-
-              <div className="flex shrink-0 gap-2">
-                <Button size="sm" variant="secondary">Ver</Button>
-                <Button size="sm">Postular</Button>
-              </div>
-            </motion.article>
-          ))}
-        </motion.div>
-      )}
+  return <div>
+    <PageHeader titulo="Oportunidades" descripcion="Solicitudes que el matching te asignó según tu perfil y disponibilidad." />
+    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <Tabs activa={tab} onChange={setTab} tabs={[{ id: 'activas', label: 'Activas', contador: items.filter(esActiva).length }, { id: 'cerradas', label: 'Cerradas', contador: items.filter(item => !esActiva(item)).length }, { id: 'todas', label: 'Todas', contador: items.length }]} />
+      <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-4 py-2 backdrop-blur-xl sm:w-72"><Search size={15} className="text-ink-muted" /><input value={q} onChange={event => setQ(event.target.value)} placeholder="Buscar oportunidad" className="min-w-0 flex-1 bg-transparent text-[14px] outline-none" /></div>
     </div>
-  )
+    {loading ? <div className="panel grid min-h-48 place-items-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /></div> : !lista.length ? <div className="panel"><EmptyState titulo="No hay oportunidades" texto="Cuando el matching te asigne una solicitud compatible, aparecerá aquí." /></div> : <motion.div variants={staggerContainer(.07)} initial="hidden" animate="show" className="max-h-[calc(100vh-250px)] space-y-3 overflow-y-auto pr-2">{lista.map(item => {
+      const solicitud = item.service_requests
+      const vencida = estaVencida(item)
+      const presupuesto = solicitud?.budget_min != null && solicitud?.budget_max != null ? `$${solicitud.budget_min} – $${solicitud.budget_max}` : 'Presupuesto por definir'
+      return <motion.article key={item.id} variants={fadeUp} className="panel panel-hover grid min-w-0 gap-4 p-5 sm:grid-cols-[56px_minmax(0,1fr)_auto_auto_auto] sm:items-center">
+        {item.requester?.avatar_url ? <img src={item.requester.avatar_url} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover" /> : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-600"><UserRound size={22} /></span>}
+        <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-[16px] font-bold" title={solicitud?.description_free ?? undefined}>{solicitud?.description_free || `Solicitud de ${solicitud?.service_type_code ?? 'servicio'}`}</h3><Badge tone={esActiva(item) ? 'brand' : 'neutral'}>{vencida ? 'Vencida' : textoEstado[item.status] ?? item.status}</Badge></div><p className="mt-1 text-[12.5px] font-medium text-brand-600">{item.requester?.full_name ?? 'HelpSeeker'}</p><div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] texto-suave"><span className="inline-flex items-center gap-1"><MapPin size={12} /> {solicitud?.modality ?? '—'} · {solicitud?.city ?? 'Sin ciudad'}</span><span className="inline-flex items-center gap-1"><CalendarClock size={12} /> Límite: {limite(solicitud?.expires_at)}</span></div></div>
+        <p className="shrink-0 text-[15px] font-bold">{presupuesto}</p>
+        <div className="shrink-0 text-center"><p className="text-[17px] font-extrabold text-success-500"><AnimatedNumber valor={Number(item.matching?.distribution_score ?? item.matching?.reciprocal_score ?? 0)} decimales={1} sufijo="%" /></p><p className="text-[11px] text-ink-muted">match real</p></div>
+        {esActiva(item) && <Button size="sm" className="justify-self-start sm:justify-self-end" onClick={() => avanzar(item)}><Send size={14} /> {item.status === 'contacted' ? 'Contactar' : 'Abrir oportunidad'}</Button>}
+      </motion.article>
+    })}</motion.div>}
+  </div>
 }

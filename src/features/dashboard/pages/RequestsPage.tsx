@@ -1,92 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Search, ArrowRight } from 'lucide-react'
+import { Plus, Search, ArrowRight, Pencil, Trash2, UserRound, Frown, CalendarClock } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Tabs } from '@/components/ui/Tabs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
-import { ProgressRing } from '../components/ProgressRing'
-import { SOLICITUDES } from '@/data/mock'
 import { staggerContainer, fadeUp } from '@/lib/motion/variants'
 import { ROUTES } from '@/config/site.config'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import { type ApiRequest, requestFromApi } from '@/lib/api/helpwork.types'
+import type { ServiceRequest } from '@/types'
 
-const EXTRA = [
-  { ...SOLICITUDES[0], id: 's4', titulo: 'Corrección de estilo APA', categoria: 'Redacción de tesis', estado: 'completado' as const, propuestas: 4, actualizadoHace: 'hace 6 d' },
-  { ...SOLICITUDES[1], id: 's5', titulo: 'Traducción de abstract', categoria: 'Redacción de tesis', estado: 'completado' as const, propuestas: 2, actualizadoHace: 'hace 9 d' },
-]
-const TODAS = [...SOLICITUDES, ...EXTRA]
-const PROGRESO: Record<string, number> = { s1: 70, s2: 35, s3: 55, s4: 100, s5: 100 }
-
-export default function RequestsPage() {
-  const [tab, setTab] = useState('activas')
-  const [q, setQ] = useState('')
-
-  const activas = TODAS.filter(s => s.estado !== 'completado')
-  const cerradas = TODAS.filter(s => s.estado === 'completado')
-  const base = tab === 'activas' ? activas : tab === 'cerradas' ? cerradas : TODAS
-  const lista = base.filter(s => s.titulo.toLowerCase().includes(q.toLowerCase()))
-
-  return (
-    <div>
-      <PageHeader titulo="Mis solicitudes" descripcion="Todo lo que has publicado y en qué va cada cosa.">
-        <Button to={ROUTES.nuevaSolicitud}><Plus size={16} /> Nueva solicitud</Button>
-      </PageHeader>
-
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs
-          activa={tab} onChange={setTab}
-          tabs={[
-            { id: 'activas', label: 'Activas', contador: activas.length },
-            { id: 'cerradas', label: 'Cerradas', contador: cerradas.length },
-            { id: 'todas', label: 'Todas', contador: TODAS.length },
-          ]}
-        />
-        <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-4 py-2 backdrop-blur-xl sm:w-72">
-          <Search size={15} className="shrink-0 text-ink-muted" />
-          <input
-            value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar solicitud"
-            className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-muted/80"
-          />
-        </div>
-      </div>
-
-      {lista.length === 0 ? (
-        <div className="panel">
-          <EmptyState titulo="Nada por aquí" texto="No hay solicitudes que coincidan con lo que buscas.">
-            <Button to={ROUTES.nuevaSolicitud} className="mt-2"><Plus size={16} /> Publicar una</Button>
-          </EmptyState>
-        </div>
-      ) : (
-        <motion.div variants={staggerContainer(0.07)} initial="hidden" animate="show" className="grid gap-3">
-          {lista.map(s => (
-            <motion.article
-              key={s.id}
-              variants={fadeUp}
-              whileHover={{ x: 5 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-              className="panel panel-hover group flex cursor-pointer items-center gap-4 p-4"
-            >
-              <ProgressRing valor={PROGRESO[s.id] ?? 50} tamano={54}
-                color={s.estado === 'completado' ? '#6096FA' : '#16A34A'} />
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-[16px] font-bold">{s.titulo}</h3>
-                <p className="truncate text-[13px] texto-suave">{s.categoria}</p>
-                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink-muted">
-                  <span>{s.propuestas} propuestas</span>
-                  <span>Actualizado {s.actualizadoHace}</span>
-                </div>
-              </div>
-              <span className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-semibold sm:block ${
-                s.estado === 'completado' ? 'bg-brand-50 text-brand-600'
-                : s.estado === 'recibiendo' ? 'bg-amber-100 text-amber-500'
-                : 'bg-success-100 text-success-500'}`}>
-                {s.estado === 'completado' ? 'Completada' : s.estado === 'recibiendo' ? 'Recibiendo propuestas' : 'En progreso'}
-              </span>
-              <ArrowRight size={17} className="shrink-0 text-ink-muted transition-transform group-hover:translate-x-1 group-hover:text-brand-600" />
-            </motion.article>
-          ))}
-        </motion.div>
-      )}
-    </div>
-  )
+export default function RequestsPage({ rutas = { solicitudes: ROUTES.solicitudes, nueva: ROUTES.nuevaSolicitud, matching: ROUTES.matching } }: { rutas?: { solicitudes: string; nueva: string; matching: string } }) {
+  const [tab, setTab] = useState('activas'); const [q, setQ] = useState(''); const [items, setItems] = useState<ServiceRequest[]>([]); const [rawItems, setRawItems] = useState<Record<string, ApiRequest>>({}); const [loading, setLoading] = useState(true); const navigate = useNavigate()
+  useEffect(() => { http.get<ApiRequest[]>(ENDPOINTS.solicitudes.list).then(rows => { setItems(rows.map(requestFromApi)); setRawItems(Object.fromEntries(rows.map(row => [row.id, row]))) }).finally(() => setLoading(false)) }, [])
+  const estaVencida = (id: string) => { const request = rawItems[id]; return request?.status === 'expired' || Boolean(request?.expires_at && new Date(request.expires_at).getTime() <= Date.now()) }
+  const limite = (id: string) => { const value = rawItems[id]?.expires_at; return value ? new Intl.DateTimeFormat('es-EC', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Guayaquil' }).format(new Date(value)) : 'Sin fecha límite' }
+  const activas = items.filter(s => s.estado !== 'completado' && !estaVencida(s.id)); const cerradas = items.filter(s => s.estado === 'completado' || estaVencida(s.id)); const base = tab === 'activas' ? activas : tab === 'cerradas' ? cerradas : items; const lista = base.filter(s => s.titulo.toLowerCase().includes(q.toLowerCase()))
+  const abrirMatching = (s: ServiceRequest) => { if (estaVencida(s.id)) return; navigate(rutas.matching, { state: { requestId: s.id } }) }
+  const eliminar = async (id: string) => { if (!window.confirm('¿Eliminar esta solicitud? Esta acción no se puede deshacer.')) return; await http.del(ENDPOINTS.solicitudes.byId(id)); setItems(rows => rows.filter(item => item.id !== id)) }
+  return <div>
+    <PageHeader titulo="Mis solicitudes" descripcion="Todo lo que has publicado y en qué va cada cosa."><Button to={rutas.nueva}><Plus size={16} /> Nueva solicitud</Button></PageHeader>
+    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><Tabs activa={tab} onChange={setTab} tabs={[{ id: 'activas', label: 'Activas', contador: activas.length }, { id: 'cerradas', label: 'Cerradas', contador: cerradas.length }, { id: 'todas', label: 'Todas', contador: items.length }]} /><div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-4 py-2 backdrop-blur-xl sm:w-72"><Search size={15} className="shrink-0 text-ink-muted" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar solicitud" className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-muted/80" /></div></div>
+    {loading ? <div className="panel grid min-h-48 place-items-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /></div> : lista.length === 0 ? <div className="panel"><EmptyState titulo="Nada por aquí" texto="No hay solicitudes que coincidan con lo que buscas."><Button to={rutas.nueva} className="mt-2"><Plus size={16} /> Publicar una</Button></EmptyState></div> : <motion.div variants={staggerContainer(.07)} initial="hidden" animate="show" className="grid gap-3">{lista.map(s => { const vencida = estaVencida(s.id); return <motion.article key={s.id} variants={fadeUp} whileHover={vencida ? undefined : { x: 5 }} transition={{ type: 'spring', stiffness: 320, damping: 26 }} onClick={() => abrirMatching(s)} className={`panel group flex items-center gap-4 p-4 text-left ${vencida ? 'cursor-default opacity-80' : 'panel-hover cursor-pointer'}`}><InterestRing total={s.propuestas} /><div className="min-w-0 flex-1"><h3 title={s.titulo} className="truncate break-all text-[16px] font-bold">{s.titulo}</h3><p className="mt-1 inline-flex items-center gap-1.5 text-[13px] texto-suave"><CalendarClock size={13} /> Límite: {limite(s.id)}</p><div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink-muted"><span>Hay {s.propuestas} persona{s.propuestas === 1 ? '' : 's'} interesada{s.propuestas === 1 ? '' : 's'} en tu trabajo</span><span>Actualizado {s.actualizadoHace}</span></div></div><span className={`hidden shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-semibold sm:block ${vencida || s.estado === 'completado' ? 'bg-brand-50 text-brand-600' : s.estado === 'recibiendo' ? 'bg-amber-100 text-amber-500' : 'bg-success-100 text-success-500'}`}>{vencida || s.estado === 'completado' ? 'Vencida' : s.estado === 'recibiendo' ? 'Recibiendo propuestas' : 'Borrador'}</span><button aria-label="Editar solicitud" onClick={e => { e.stopPropagation(); navigate(rutas.nueva, { state: { request: rawItems[s.id] } }) }} className="rounded-lg p-2 text-ink-muted transition hover:bg-brand-50 hover:text-brand-600"><Pencil size={16} /></button><button aria-label="Eliminar solicitud" onClick={e => { e.stopPropagation(); eliminar(s.id).catch(() => undefined) }} className="rounded-lg p-2 text-ink-muted transition hover:bg-red-50 hover:text-red-600"><Trash2 size={16} /></button><ArrowRight size={17} className={`shrink-0 ${vencida ? 'text-ink-muted/40' : 'text-ink-muted transition-transform group-hover:translate-x-1 group-hover:text-brand-600'}`} /></motion.article>})}</motion.div>}
+  </div>
 }
+
+function InterestRing({ total }: { total: number }) { const visible = Math.min(total, 5); return <span className={`grid h-[58px] w-[58px] shrink-0 place-items-center rounded-full border-2 ${total === 0 ? 'border-red-300 bg-red-50 text-red-500' : 'border-brand-300 bg-brand-50 text-brand-600'}`}>{total === 0 ? <Frown size={27} strokeWidth={1.8} /> : <span className="flex -space-x-2.5">{Array.from({ length: visible }).map((_, index) => <UserRound key={index} size={visible > 3 ? 17 : 22} strokeWidth={1.8} />)}</span>}</span> }

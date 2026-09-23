@@ -24,6 +24,8 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
+  const [error, setError] = useState('')
+  const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
     if (state?.startTour) {
@@ -32,11 +34,13 @@ export default function LoginPage() {
     }
   }, [state, start])
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO backend:  await http.post(ENDPOINTS.auth.login, form)
-    const sesion = login({ email: form.email })
-    navigate(sesion.rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante)
+    setError(''); setEnviando(true)
+    try {
+      const sesion = await login(form)
+      navigate(sesion.rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo iniciar sesión.') } finally { setEnviando(false) }
   }
 
   return (
@@ -77,8 +81,9 @@ export default function LoginPage() {
         </div>
 
         <div data-tour="login-submit" className="pt-1">
-          <Button type="submit" size="lg" fullWidth>Iniciar sesión</Button>
+          <Button type="submit" size="lg" fullWidth disabled={enviando}>{enviando ? 'Ingresando…' : 'Iniciar sesión'}</Button>
         </div>
+        {error && <p className="text-center text-[13px] text-red-600">{error}</p>}
       </form>
 
       <p data-tour="login-register" className="mt-6 text-center text-[14.5px] text-ink-soft">

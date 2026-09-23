@@ -13,17 +13,15 @@ export class ApiError extends Error {
   }
 }
 
-let authToken: string | null = null
-export const setAuthToken = (token: string | null) => { authToken = token }
-
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = options.body instanceof FormData
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
+    credentials: 'include',
   })
 
   const isJson = res.headers.get('content-type')?.includes('application/json')
@@ -39,5 +37,7 @@ export const http = {
   get:  <T>(p: string) => request<T>(p),
   post: <T>(p: string, data?: unknown) => request<T>(p, { method: 'POST', body: JSON.stringify(data) }),
   put:  <T>(p: string, data?: unknown) => request<T>(p, { method: 'PUT', body: JSON.stringify(data) }),
+  patch: <T>(p: string, data?: unknown) => request<T>(p, { method: 'PATCH', body: JSON.stringify(data) }),
   del:  <T>(p: string) => request<T>(p, { method: 'DELETE' }),
+  postForm: <T>(p: string, data: FormData) => request<T>(p, { method: 'POST', body: data, headers: {} }),
 }

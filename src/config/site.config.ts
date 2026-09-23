@@ -9,28 +9,17 @@ export const ROUTES = {
   login: '/iniciar-sesion',
   registro: '/registro',
   registroRol: '/registro/rol',
+  authCallback: '/auth/callback',
   // --- Solicitante ---
   appSolicitante: '/app/solicitante',
-  solicitudes: '/app/solicitudes',
-  nuevaSolicitud: '/app/solicitudes/nueva',
-  propuestas: '/app/propuestas',
-  favoritos: '/app/favoritos',
-  pagos: '/app/pagos',
-  matching: '/app/matching',
+  solicitudes: '/app/solicitante/solicitudes', nuevaSolicitud: '/app/solicitante/solicitudes/nueva', propuestas: '/app/solicitante/propuestas', favoritos: '/app/solicitante/favoritos', pagos: '/app/solicitante/pagos', matching: '/app/solicitante/matching', calendarioSolicitante: '/app/solicitante/calendario', resenasSolicitante: '/app/solicitante/resenas', perfilSolicitante: '/app/solicitante/perfil', mensajesSolicitante: '/app/solicitante/mensajes', notificacionesSolicitante: '/app/solicitante/notificaciones', ajustesSolicitante: '/app/solicitante/ajustes', ayudaSolicitante: '/app/solicitante/ayuda',
   // --- HelpWorker ---
   appHelpWorker: '/app/helpworker',
-  oportunidades: '/app/oportunidades',
-  trabajos: '/app/trabajos',
-  calendario: '/app/calendario',
-  resenas: '/app/resenas',
-  perfil: '/app/perfil',
-  ganancias: '/app/ganancias',
-  matchingHW: '/app/matching-trabajos',
-  // --- Comunes ---
-  mensajes: '/app/mensajes',
-  notificaciones: '/app/notificaciones',
-  ajustes: '/app/ajustes',
-  ayuda: '/app/ayuda',
+  oportunidades: '/app/helpworker/oportunidades', matchingHW: '/app/helpworker/matching', trabajos: '/app/helpworker/trabajos', calendario: '/app/helpworker/calendario', resenas: '/app/helpworker/resenas', perfil: '/app/helpworker/perfil', ganancias: '/app/helpworker/ganancias', mensajes: '/app/helpworker/mensajes', notificaciones: '/app/helpworker/notificaciones', ajustes: '/app/helpworker/ajustes', ayuda: '/app/helpworker/ayuda',
+  // --- Faceta solicitante exclusiva del HelpWorker con doble rol ---
+  proveedorSolicitudes: '/app/helpworker/solicitante/solicitudes', proveedorNuevaSolicitud: '/app/helpworker/solicitante/solicitudes/nueva', proveedorMatchingSolicitudes: '/app/helpworker/solicitante/matching', proveedorPropuestas: '/app/helpworker/solicitante/propuestas', proveedorFavoritos: '/app/helpworker/solicitante/favoritos',
+  // --- Administrador (estructura preparada; módulos administrativos después) ---
+  appAdministrador: '/app/administrador',
 } as const
 
 export const NAV_LINKS = [

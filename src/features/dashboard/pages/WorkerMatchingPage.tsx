@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Clock, MapPin, Users, Wallet, Send, Bookmark, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -8,6 +9,10 @@ import { SOLICITUDES_COMPATIBLES } from '@/data/appData'
 import { useMessages } from '@/features/messages/MessagesContext'
 import { TERMINOS } from '@/config/site.config'
 import { staggerContainer, fadeUp } from '@/lib/motion/variants'
+import { Tabs } from '@/components/ui/Tabs'
+import { useAuth } from '@/features/auth/AuthContext'
+import ProveedorMatchingSolicitudesPage from '@/features/proveedor/solicitante/ProveedorMatchingSolicitudesPage'
+import { useLocation } from 'react-router-dom'
 
 const CRITERIOS = [
   { t: 'Tus habilidades', d: 'Lo que pide encaja con lo que declaraste en tu perfil.' },
@@ -24,6 +29,10 @@ const CRITERIOS = [
  */
 export default function WorkerMatchingPage() {
   const { abrirChat } = useMessages()
+  const { usuario } = useAuth()
+  const dobleRol = usuario?.roles.includes('solicitante') ?? false
+  const { state } = useLocation() as { state?: { tab?: 'compatibles' | 'mis-solicitudes' } }
+  const [tab, setTab] = useState<'compatibles' | 'mis-solicitudes'>(state?.tab ?? 'compatibles')
 
   return (
     <div>
@@ -31,6 +40,10 @@ export default function WorkerMatchingPage() {
         titulo="Matching inteligente"
         descripcion={`Solicitudes de ${TERMINOS.solicitante.plural} que encajan con tu perfil.`}
       />
+
+      {dobleRol && <div className="mb-5"><Tabs idLayout="matching-helpworker" activa={tab} onChange={id => setTab(id as 'compatibles' | 'mis-solicitudes')} tabs={[{ id: 'compatibles', label: 'Solicitudes compatibles' }, { id: 'mis-solicitudes', label: 'Mis solicitudes' }]} /></div>}
+
+      {tab === 'mis-solicitudes' ? <ProveedorMatchingSolicitudesPage /> : <>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
         <motion.div variants={staggerContainer(0.1)} initial="hidden" animate="show" className="space-y-4">
@@ -104,6 +117,7 @@ export default function WorkerMatchingPage() {
           </p>
         </motion.aside>
       </div>
+      </>}
     </div>
   )
 }

@@ -12,7 +12,7 @@
    PONER EN `false` ANTES DE PUBLICAR: en producción la gente espera que
    su sesión siga abierta al volver.
 ------------------------------------------------------------------- */
-export const MODO_DEMO = true
+export const MODO_DEMO = false
 
 /** Prefijo de todo lo que la app guarda en el navegador. */
 export const PREFIJO_ALMACENAMIENTO = 'helpwork:'
