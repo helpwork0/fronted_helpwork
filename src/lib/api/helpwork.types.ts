@@ -20,7 +20,10 @@ export interface ApiProviderService {
   price_min?: number | null; price_max?: number | null; specialization_score?: number | null; opportunity_interest_score?: number | null; semantic_score?: number | null; excluded_topic_codes?: string[]
 }
 export interface ApiProviderAvailability { availability_status?: string; timezone?: string; weekly_slots?: { dia: number; inicio: string; fin: string }[]; hours_per_week?: number; committed_hours?: number; max_concurrent_services?: number; response_window_minutes?: number }
-export interface ApiReview { id: string; request_id?: string; rating: number; comment?: string | null; created_at: string; users?: { full_name?: string; avatar_url?: string | null } | null }
+export interface ApiPublicProviderProfile { usuario: { id: string; full_name?: string; avatar_url?: string | null }; perfilProveedor: { user_id: string; display_name?: string | null; city?: string | null; average_rating?: number | null; review_count?: number | null }; servicios: ApiProviderService[]; disponibilidad: ApiProviderAvailability | null }
+export interface ApiFavoriteProvider { provider_id: string; created_at: string; perfil: ApiPublicProviderProfile }
+export interface ApiPublicRequesterProfile { usuario: { id: string; full_name?: string; avatar_url?: string | null }; perfilSolicitante: { user_id: string; city?: string | null; academic_program?: string | null; academic_level?: string | null; preferred_languages?: string[] | null; average_rating?: number | null; review_count?: number | null } | null }
+export interface ApiReview { id: string; request_id?: string; reviewer_id?: string; rating: number; comment?: string | null; created_at: string; users?: { full_name?: string; avatar_url?: string | null } | null }
 export interface ApiBlock { blocked_id: string; reason?: string | null; created_at: string; users?: { full_name?: string; avatar_url?: string | null } | null }
 export interface ApiTask { id: string; title: string; description?: string | null; task_type: string; status: 'pending' | 'queued' | 'processing' | 'completed' | 'failed'; scheduled_for: string; completed_at?: string | null; last_error?: string | null }
 export interface ApiProviderOpportunity { id: string; request_id: string; status: string; rank_position: number; created_at: string; matching?: { distribution_score?: number; reciprocal_score?: number } | null; requester?: { id: string; full_name?: string; avatar_url?: string | null } | null; service_requests?: { field_code?: string; service_type_code?: string; academic_level?: string; modality?: string; city?: string | null; budget_min?: number | null; budget_max?: number | null; expires_at?: string | null; status?: string; description_free?: string | null } | null }
@@ -43,7 +46,7 @@ export interface ApiRequest {
   budget_min?: number | null; budget_max?: number | null; needed_at?: string | null; expires_at?: string | null; description_free?: string | null; updated_at?: string
   request_topics?: { topic_code: string }[]; recommendation_assignments?: { id: string; status: string }[]; matching_count?: number
 }
-export interface ApiRequestAttachment { id: string; original_name: string; mime_type: string; file_kind: 'pdf' | 'word' | 'image'; size_bytes: number; created_at: string; url?: string }
+export interface ApiRequestAttachment { id: string; original_name: string; mime_type: string; file_kind: 'pdf' | 'word' | 'image'; size_bytes: number; created_at: string; url?: string; preview_url?: string | null }
 
 export const requestFromApi = (request: ApiRequest): ServiceRequest => ({
   id: request.id,

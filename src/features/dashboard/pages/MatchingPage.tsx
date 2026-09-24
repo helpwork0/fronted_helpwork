@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Calendar, CircleDollarSign, Monitor, ShieldCheck, Headphones, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { MatchCard } from '../components/MatchCard'
@@ -13,6 +14,7 @@ import { http } from '@/lib/api/http'
 import { ENDPOINTS } from '@/lib/api/endpoints'
 import { type ApiRecommendation, type ApiRequest, type ApiRankingCandidate, rankingFromApi } from '@/lib/api/helpwork.types'
 import type { MatchCandidate } from '@/types'
+import { ProviderProfileModal } from '../components/ProviderProfileModal'
 
 const CRITERIOS = [
   { titulo: 'Habilidades',    texto: 'Tienen experiencia en los temas y el nivel que necesitas.' },
@@ -33,9 +35,11 @@ const CRITERIOS = [
 export default function MatchingPage({ embedded = false, volverA = ROUTES.solicitudes }: { embedded?: boolean; volverA?: string }) {
   useAutoTour('matching')
   const { state } = useLocation() as { state?: { requestId?: string } }
+  const navigate = useNavigate()
   const [request, setRequest] = useState<ApiRequest | null>(null)
   const [candidates, setCandidates] = useState<MatchCandidate[]>([])
   const [loading, setLoading] = useState(true)
+  const [profileProviderId, setProfileProviderId] = useState<string | null>(null)
   useEffect(() => {
     http.get<ApiRequest[]>(ENDPOINTS.solicitudes.list).then(async requests => {
       const selected = requests.find(item => item.id === state?.requestId) ?? requests.find(item => item.status === 'active') ?? requests[0]
@@ -159,7 +163,7 @@ export default function MatchingPage({ embedded = false, volverA = ROUTES.solici
             variants={staggerContainer(0.1)} initial="hidden" animate="show"
             data-tour="match-lista" className="grid gap-4 2xl:grid-cols-2"
           >
-            {candidates.map(c => <MatchCard key={c.id} c={c} onBlock={id => bloquear(id).catch(() => undefined)} onReport={id => reportar(id).catch(() => undefined)} />)}
+            {candidates.map(c => <MatchCard key={c.id} c={c} onBlock={id => bloquear(id).catch(() => undefined)} onReport={id => reportar(id).catch(() => undefined)} onProfile={setProfileProviderId} onContact={() => navigate(embedded ? ROUTES.mensajes : ROUTES.mensajesSolicitante)} />)}
           </motion.div>}
 
           <p className="mt-5 flex items-center justify-center gap-2 text-[12.5px] texto-suave">
@@ -168,6 +172,7 @@ export default function MatchingPage({ embedded = false, volverA = ROUTES.solici
           </p>
         </section>
       </div>
+      <ProviderProfileModal providerId={profileProviderId} onClose={() => setProfileProviderId(null)} onFavoriteChange={async isFavorite => { if (!profileProviderId) return; if (isFavorite) await http.post(ENDPOINTS.usuarios.favoritoProveedor(profileProviderId)); else await http.del(ENDPOINTS.usuarios.favoritoProveedor(profileProviderId)); }} />
     </div>
   )
 }

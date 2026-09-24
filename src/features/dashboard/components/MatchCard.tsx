@@ -18,7 +18,7 @@ import type { MatchCandidate } from '@/types'
  * Solo se reparte en fila dentro de cada bloque, con `sm:`, que a esa
  * altura sí hay espacio garantizado.
  */
-export function MatchCard({ c, onBlock, onReport }: { c: MatchCandidate; onBlock?: (providerId: string) => void; onReport?: (providerId: string) => void }) {
+export function MatchCard({ c, onBlock, onReport, onProfile, onContact }: { c: MatchCandidate; onBlock?: (providerId: string) => void; onReport?: (providerId: string) => void; onProfile?: (providerId: string) => void; onContact?: () => void }) {
   return (
     <motion.article variants={fadeUp} className="panel panel-hover p-5">
 
@@ -35,10 +35,10 @@ export function MatchCard({ c, onBlock, onReport }: { c: MatchCandidate; onBlock
             {c.verificado && <BadgeCheck size={16} className="shrink-0 text-brand-500" />}
           </h3>
           <p className="truncate text-[13.5px] texto-suave">{c.profesion}</p>
-          <p className="mt-0.5 flex items-center gap-1 text-[12.5px] text-ink-muted">
+          {c.reseñas > 0 ? <p className="mt-0.5 flex items-center gap-1 text-[12.5px] text-ink-muted">
             <Lightbulb size={12} className="shrink-0 text-brand-500" fill="currentColor" />
             {c.rating} · {c.reseñas} reseñas
-          </p>
+          </p> : <p className="mt-0.5 text-[12.5px] text-ink-muted">Sin valoraciones</p>}
         </div>
 
         <div className="shrink-0 text-right">
@@ -82,10 +82,10 @@ export function MatchCard({ c, onBlock, onReport }: { c: MatchCandidate; onBlock
 
       {/* --- Acciones --- */}
       <div className="mt-4 flex flex-wrap gap-2 border-t border-white/60 pt-4">
-        <Button size="sm" className="flex-1 sm:flex-none">
+        <Button size="sm" className="flex-1 sm:flex-none" onClick={onContact}>
           <MessageSquare size={14} /> Contactar
         </Button>
-        <Button size="sm" variant="secondary" className="flex-1 sm:flex-none">
+        <Button size="sm" variant="secondary" className="flex-1 sm:flex-none" onClick={() => onProfile?.(c.id)}>
           Ver perfil
         </Button>
         {onBlock && <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => onBlock(c.id)}>

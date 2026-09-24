@@ -12,6 +12,7 @@ import { useAuth } from '@/features/auth/AuthContext'
 import { http } from '@/lib/api/http'
 import { ENDPOINTS } from '@/lib/api/endpoints'
 import type { ApiProviderOpportunity } from '@/lib/api/helpwork.types'
+import { RequesterProposalModal } from '../components/RequesterProposalModal'
 
 const estadosActivos = new Set(['assigned', 'shown', 'opened', 'contacted'])
 const textoEstado: Record<string, string> = { assigned: 'Nueva', shown: 'Nueva', opened: 'Abierta', contacted: 'Contactada', accepted: 'Aceptada', rejected: 'Rechazada', expired: 'Vencida' }
@@ -25,6 +26,7 @@ export default function OpportunitiesPage() {
   const [tab, setTab] = useState('activas')
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<ApiProviderOpportunity | null>(null)
 
   const cargar = () => {
     if (!usuario) return
@@ -35,11 +37,13 @@ export default function OpportunitiesPage() {
   const esActiva = (item: ApiProviderOpportunity) => estadosActivos.has(item.status) && !estaVencida(item)
   const base = tab === 'activas' ? items.filter(esActiva) : tab === 'cerradas' ? items.filter(item => !esActiva(item)) : items
   const lista = useMemo(() => base.filter(item => `${item.requester?.full_name} ${item.service_requests?.description_free} ${item.service_requests?.field_code} ${item.service_requests?.service_type_code}`.toLowerCase().includes(q.toLowerCase())), [base, q])
-  const avanzar = async (item: ApiProviderOpportunity) => {
-    // Consultar una oportunidad no debe marcarla como “vista”; el primer cambio útil es abrirla.
-    const siguiente = item.status === 'assigned' || item.status === 'shown' ? 'opened' : 'contacted'
-    await http.patch(ENDPOINTS.recomendaciones.estado(item.id), { status: siguiente })
-    cargar()
+  const verPropuesta = async (item: ApiProviderOpportunity) => {
+    // Abrir la propuesta registra una exposición; no inicia contacto ni conversación.
+    if (item.status === 'assigned' || item.status === 'shown') {
+      await http.patch(ENDPOINTS.recomendaciones.estado(item.id), { status: 'opened' })
+      setItems(current => current.map(candidate => candidate.id === item.id ? { ...candidate, status: 'opened' } : candidate))
+    }
+    setSelected(item)
   }
 
   return <div>
@@ -57,8 +61,9 @@ export default function OpportunitiesPage() {
         <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-[16px] font-bold" title={solicitud?.description_free ?? undefined}>{solicitud?.description_free || `Solicitud de ${solicitud?.service_type_code ?? 'servicio'}`}</h3><Badge tone={esActiva(item) ? 'brand' : 'neutral'}>{vencida ? 'Vencida' : textoEstado[item.status] ?? item.status}</Badge></div><p className="mt-1 text-[12.5px] font-medium text-brand-600">{item.requester?.full_name ?? 'HelpSeeker'}</p><div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] texto-suave"><span className="inline-flex items-center gap-1"><MapPin size={12} /> {solicitud?.modality ?? '—'} · {solicitud?.city ?? 'Sin ciudad'}</span><span className="inline-flex items-center gap-1"><CalendarClock size={12} /> Límite: {limite(solicitud?.expires_at)}</span></div></div>
         <p className="shrink-0 text-[15px] font-bold">{presupuesto}</p>
         <div className="shrink-0 text-center"><p className="text-[17px] font-extrabold text-success-500"><AnimatedNumber valor={Number(item.matching?.distribution_score ?? item.matching?.reciprocal_score ?? 0)} decimales={1} sufijo="%" /></p><p className="text-[11px] text-ink-muted">match real</p></div>
-        {esActiva(item) && <Button size="sm" className="justify-self-start sm:justify-self-end" onClick={() => avanzar(item)}><Send size={14} /> {item.status === 'contacted' ? 'Contactar' : 'Abrir oportunidad'}</Button>}
+        {esActiva(item) && <Button size="sm" className="justify-self-start sm:justify-self-end" onClick={() => verPropuesta(item).catch(() => undefined)}><Send size={14} /> Ver propuesta</Button>}
       </motion.article>
     })}</motion.div>}
+    <RequesterProposalModal item={selected} onClose={() => setSelected(null)} />
   </div>
 }
