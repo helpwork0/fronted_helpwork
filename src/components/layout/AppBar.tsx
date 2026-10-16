@@ -19,8 +19,9 @@ export function AppBar({ notificationsTo }: { notificationsTo: string }) {
   const refresh = () => http.get<{ unreadCount: number }>(ENDPOINTS.notificaciones.summary).then(r => setUnread(r.unreadCount)).catch(() => setUnread(0))
   useEffect(() => {
     refresh()
+    const timer = window.setInterval(refresh, 10000)
     window.addEventListener('helpwork:notificaciones-actualizadas', refresh)
-    return () => window.removeEventListener('helpwork:notificaciones-actualizadas', refresh)
+    return () => { window.clearInterval(timer); window.removeEventListener('helpwork:notificaciones-actualizadas', refresh) }
   }, [])
 
   const toggleNotifications = async () => {

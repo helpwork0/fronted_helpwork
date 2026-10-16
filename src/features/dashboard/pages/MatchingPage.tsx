@@ -41,17 +41,32 @@ export default function MatchingPage({ embedded = false, volverA = ROUTES.solici
   const [loading, setLoading] = useState(true)
   const [profileProviderId, setProfileProviderId] = useState<string | null>(null)
   useEffect(() => {
-    http.get<ApiRequest[]>(ENDPOINTS.solicitudes.list).then(async requests => {
-      const selected = requests.find(item => item.id === state?.requestId) ?? requests.find(item => item.status === 'active') ?? requests[0]
-      if (!selected) return
-      // Abrir Matching nunca cambia el estado: solo consulta las recomendaciones ya calculadas.
-      setRequest(selected)
-      if (selected.status !== 'active') { setCandidates([]); return }
-      const ranking = await http.get<ApiRankingCandidate[]>(ENDPOINTS.recomendaciones.ranking(selected.id))
-      const stored = await http.get<ApiRecommendation[]>(ENDPOINTS.recomendaciones.solicitud(selected.id))
-      setCandidates(ranking.map(rankingFromApi))
-      await Promise.all(stored.filter(item => item.status === 'assigned').map(item => http.patch(ENDPOINTS.recomendaciones.estado(item.id), { status: 'shown' })))
-    }).catch(() => setCandidates([])).finally(() => setLoading(false))
+    let active = true
+    const startedAt = Date.now()
+    setLoading(true)
+    const cargar = async () => {
+      try {
+        const requests = await http.get<ApiRequest[]>(ENDPOINTS.solicitudes.list)
+        const selected = requests.find(item => item.id === state?.requestId) ?? requests.find(item => item.status === 'active') ?? requests[0]
+        if (!selected) return
+        // Abrir Matching nunca cambia el estado: solo consulta las recomendaciones ya calculadas.
+        if (!active) return
+        setRequest(selected)
+        if (selected.status !== 'active') { setCandidates([]); return }
+        const [ranking, stored] = await Promise.all([
+          http.get<ApiRankingCandidate[]>(ENDPOINTS.recomendaciones.ranking(selected.id)),
+          http.get<ApiRecommendation[]>(ENDPOINTS.recomendaciones.solicitud(selected.id)),
+        ])
+        if (!active) return
+        setCandidates(ranking.map(rankingFromApi))
+        await Promise.all(stored.filter(item => item.status === 'assigned').map(item => http.patch(ENDPOINTS.recomendaciones.estado(item.id), { status: 'shown' })))
+      } catch { if (active) setCandidates([]) } finally {
+        const remaining = Math.max(0, 3000 - (Date.now() - startedAt))
+        window.setTimeout(() => { if (active) setLoading(false) }, remaining)
+      }
+    }
+    cargar()
+    return () => { active = false }
   }, [state?.requestId])
   const presupuesto = useMemo(() => request?.budget_min != null && request?.budget_max != null ? `$${request.budget_min} – $${request.budget_max}` : 'Por definir', [request])
   const bloquear = async (providerId: string) => {
@@ -159,7 +174,7 @@ export default function MatchingPage({ embedded = false, volverA = ROUTES.solici
             <p className="text-[12.5px] texto-suave">Ordenados por compatibilidad</p>
           </div>
 
-          {loading ? <div className="panel grid min-h-48 place-items-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /></div> : <motion.div
+          {loading ? <MatchingThinking /> : <motion.div
             variants={staggerContainer(0.1)} initial="hidden" animate="show"
             data-tour="match-lista" className="grid gap-4 2xl:grid-cols-2"
           >
@@ -175,6 +190,10 @@ export default function MatchingPage({ embedded = false, volverA = ROUTES.solici
       <ProviderProfileModal providerId={profileProviderId} onClose={() => setProfileProviderId(null)} onFavoriteChange={async isFavorite => { if (!profileProviderId) return; if (isFavorite) await http.post(ENDPOINTS.usuarios.favoritoProveedor(profileProviderId)); else await http.del(ENDPOINTS.usuarios.favoritoProveedor(profileProviderId)); }} />
     </div>
   )
+}
+
+function MatchingThinking() {
+  return <motion.div initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }} className="panel grid min-h-[300px] place-items-center overflow-hidden p-8 text-center"><div><div className="relative mx-auto h-20 w-20"><motion.span animate={{ rotate: 360 }} transition={{ duration: 7, repeat: Infinity, ease: 'linear' }} className="absolute inset-0 rounded-full border border-brand-200/80 border-t-brand-500" />{[0, 1, 2].map(index => <motion.span key={index} animate={{ opacity: [0.25, 1, .25], scale: [.7, 1.25, .7], y: [0, -4, 0] }} transition={{ duration: 1.35, repeat: Infinity, delay: index * .22 }} className="absolute text-brand-500" style={{ left: `${20 + index * 21}px`, top: `${21 + (index === 1 ? -7 : 6)}px` }}><Sparkles size={index === 1 ? 27 : 17} fill="currentColor" /></motion.span>)}</div><h3 className="mt-6 text-[18px] font-bold">La IA está buscando HelpWorkers compatibles</h3><p className="mt-2 max-w-sm text-[13.5px] leading-relaxed texto-suave">Por favor espera mientras analiza habilidades, disponibilidad, reputación, modalidad y presupuesto.</p><div className="mt-5 flex justify-center gap-1.5">{[0, 1, 2].map(index => <motion.span key={index} animate={{ y: [0, -5, 0], opacity: [.35, 1, .35] }} transition={{ duration: .9, repeat: Infinity, delay: index * .16 }} className="h-2 w-2 rounded-full bg-brand-500" />)}</div></div></motion.div>
 }
 
 function Dato({ icon: Icon, label, valor }: { icon: typeof Monitor; label: string; valor: string }) {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Search, LayoutGrid, MessageSquare, PencilLine, PlusCircle, BadgeCheck, Star,
@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/Button'
 import { AnimatedNumber } from '../components/AnimatedNumber'
 import { ProgressRing } from '../components/ProgressRing'
 import { Mascot } from '@/components/mascot/Mascot'
-import { SOLICITUDES, CANDIDATOS } from '@/data/mock'
-import { HELPWORKERS_ACTIVOS } from '@/data/appData'
 import { PresenceList } from '../components/PresenceList'
 import { TERMINOS } from '@/config/site.config'
 import { useMessages } from '@/features/messages/MessagesContext'
@@ -18,6 +16,10 @@ import { staggerContainer, fadeUp } from '@/lib/motion/variants'
 import { useAutoTour } from '@/components/onboarding/useAutoTour'
 import { ROUTES } from '@/config/site.config'
 import { cn } from '@/lib/cn'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import { requestFromApi, rankingFromApi, type ApiRequest, type ApiRankingCandidate } from '@/lib/api/helpwork.types'
+import { CmsAnnouncements } from '../components/CmsAnnouncements'
 
 const CATEGORIAS = [
   { icon: GraduationCap, label: 'Clases particulares' },
@@ -53,6 +55,28 @@ export default function SeekerHomePage() {
   const { usuario } = useAuth()
   const { abrirChat, conversaciones } = useMessages()
   const [categoria, setCategoria] = useState(0)
+  const [requests, setRequests] = useState<ApiRequest[]>([])
+  const [recomendados, setRecomendados] = useState<ReturnType<typeof rankingFromApi>[]>([])
+  const [propuestasPendientes, setPropuestasPendientes] = useState(0)
+  const [cargandoDatos, setCargandoDatos] = useState(true)
+
+  useEffect(() => {
+    let activo = true
+    Promise.all([
+      http.get<ApiRequest[]>(ENDPOINTS.solicitudes.list),
+      http.get<{ pendientes: number }>(ENDPOINTS.propuestas.requesterSummary),
+    ]).then(async ([solicitudes, resumen]) => {
+      if (!activo) return
+      setRequests(solicitudes)
+      setPropuestasPendientes(resumen.pendientes)
+      const primera = solicitudes.find(item => item.status === 'active')
+      if (primera) {
+        const ranking = await http.get<ApiRankingCandidate[]>(ENDPOINTS.recomendaciones.ranking(primera.id))
+        if (activo) setRecomendados(ranking.map(item => rankingFromApi(item)))
+      }
+    }).catch(() => { if (activo) { setRequests([]); setRecomendados([]) } }).finally(() => { if (activo) setCargandoDatos(false) })
+    return () => { activo = false }
+  }, [])
 
   const hora = new Date().getHours()
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
@@ -110,11 +134,13 @@ export default function SeekerHomePage() {
         </div>
       </motion.section>
 
+      <motion.div variants={fadeUp}><CmsAnnouncements /></motion.div>
+
       {/* ---------- Métricas ---------- */}
       <motion.section variants={staggerContainer(0.06)} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metrica icon={FileText}      label="Solicitudes activas" valor={3}  tono="brand" />
-        <Metrica icon={LayoutGrid}    label="Propuestas recibidas" valor={10} tono="success" />
-        <Metrica icon={Clock}         label="Respuesta promedio" valor={2.25} decimales={2} sufijo=" h" tono="amber" />
+        <Metrica icon={FileText}      label="Solicitudes activas" valor={requests.filter(item => item.status === 'active').length}  tono="brand" />
+        <Metrica icon={LayoutGrid}    label="Propuestas pendientes" valor={propuestasPendientes} tono="success" />
+        <Metrica icon={Clock}         label="Solicitudes publicadas" valor={requests.length} tono="amber" />
         <Metrica icon={MessageSquare} label="Chats activos" valor={conversaciones.length} tono="violet" />
       </motion.section>
 
@@ -127,7 +153,7 @@ export default function SeekerHomePage() {
           </header>
 
           <div className="space-y-2.5">
-            {SOLICITUDES.map((s, i) => (
+            {(requests.length ? requests.map(requestFromApi) : []).map(s => (
               <motion.article
                 key={s.id}
                 variants={fadeUp}
@@ -135,10 +161,10 @@ export default function SeekerHomePage() {
                 transition={{ type: 'spring', stiffness: 320, damping: 26 }}
                 className="group flex cursor-pointer items-center gap-4 rounded-xl2 border border-white/70 bg-white/55 p-3.5 transition-colors hover:bg-white/85"
               >
-                <ProgressRing valor={[70, 35, 55][i]} tamano={50} />
+                <ProgressRing valor={Math.min(100, s.propuestas * 20)} tamano={50} />
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-[15.5px] font-bold">{s.titulo}</h3>
-                  <p className="truncate text-[13px] texto-suave">{s.categoria} · {s.propuestas} propuestas</p>
+                  <p className="truncate text-[13px] texto-suave">{s.propuestas} recomendaciones</p>
                 </div>
                 <div className="hidden shrink-0 text-right sm:block">
                   <p className="text-[13px] font-semibold text-success-500">
@@ -149,6 +175,8 @@ export default function SeekerHomePage() {
                 <ArrowRight size={16} className="shrink-0 text-ink-muted transition-transform group-hover:translate-x-1 group-hover:text-brand-600" />
               </motion.article>
             ))}
+            {!cargandoDatos && !requests.length && <p className="py-8 text-center text-sm texto-suave">Todavía no tienes solicitudes.</p>}
+            {cargandoDatos && <p className="py-8 text-center text-sm texto-suave">Cargando tus solicitudes…</p>}
           </div>
         </motion.section>
 
@@ -160,7 +188,7 @@ export default function SeekerHomePage() {
           </header>
 
           <div className="space-y-2.5">
-            {CANDIDATOS.map((c, i) => (
+            {recomendados.map((c, i) => (
               <motion.div
                 key={c.id}
                 variants={fadeUp}
@@ -184,11 +212,11 @@ export default function SeekerHomePage() {
                   </p>
                   <p className="text-[11px] text-ink-muted">match</p>
                 </div>
-                <Button size="sm" className="shrink-0" onClick={() => abrirChat(`cv${i + 1}`)}>
-                  Chat
-                </Button>
+                <Button size="sm" className="shrink-0" to={ROUTES.matching}>Ver perfil</Button>
               </motion.div>
             ))}
+            {!cargandoDatos && !recomendados.length && <p className="py-8 text-center text-sm texto-suave">Aún no hay HelpWorkers recomendados.</p>}
+            {cargandoDatos && <p className="py-8 text-center text-sm texto-suave">Buscando HelpWorkers compatibles…</p>}
           </div>
         </motion.section>
       </div>
@@ -198,7 +226,7 @@ export default function SeekerHomePage() {
       <motion.div variants={fadeUp}>
         <PresenceList
           titulo={`${TERMINOS.helpworker.plural} disponibles`}
-          gente={HELPWORKERS_ACTIVOS}
+          gente={recomendados.slice(0, 5).map((c) => ({ id: c.id, nombre: c.nombre, avatarUrl: c.avatarUrl, detalle: c.profesion, etiqueta: `${c.match}% match`, estado: 'en_linea' as const }))}
           textoBoton="Escribir"
           onAccion={() => abrirChat('cv1')}
           verTodos={ROUTES.matching}
@@ -209,11 +237,8 @@ export default function SeekerHomePage() {
         <motion.section variants={fadeUp} data-tour="panel-acciones" className="panel p-5">
           <h2 className="mb-4 text-[18px] font-bold">Acciones rápidas</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {ACCIONES.map(a => (
-              <button
-                key={a.titulo}
-                className="group flex items-center gap-3.5 rounded-xl2 border border-white/70 bg-white/55 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-lift"
-              >
+            {ACCIONES.map((a, index) => (
+              <Button key={a.titulo} to={[ROUTES.propuestas, ROUTES.mensajesSolicitante, ROUTES.solicitudes, ROUTES.nuevaSolicitud][index]} variant="ghost" className="group flex h-auto items-center gap-3.5 rounded-xl2 border border-white/70 bg-white/55 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-lift">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-600 group-hover:text-white">
                   <a.icon size={19} />
                 </span>
@@ -221,7 +246,7 @@ export default function SeekerHomePage() {
                   <span className="block text-[14.5px] font-bold text-brand-600">{a.titulo}</span>
                   <span className="block text-[12.5px] texto-suave">{a.texto}</span>
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
         </motion.section>
@@ -231,7 +256,7 @@ export default function SeekerHomePage() {
           <h2 className="mb-4 text-[18px] font-bold">Actividad reciente</h2>
           <ol className="relative space-y-4 pl-1">
             <span className="absolute bottom-3 left-[19px] top-3 w-px bg-gradient-to-b from-brand-200 via-brand-100 to-transparent" />
-            {ACTIVIDAD.map((a, i) => (
+            {(requests.length ? requests.slice(0, 4).map((request) => ({ icon: FileText, texto: `Solicitud: ${request.description_free || request.service_type_code}`, hace: request.status, tono: 'brand' as const })) : ACTIVIDAD).map((a, i) => (
               <motion.li
                 key={a.texto}
                 initial={{ opacity: 0, x: -12 }}

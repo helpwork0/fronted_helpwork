@@ -6,7 +6,7 @@ import { Logo } from './Logo'
 import { Button } from '@/components/ui/Button'
 import { Container } from '@/components/ui/Container'
 import { useScrolledPast } from '@/hooks/useScrollY'
-import { NAV_LINKS, ROUTES } from '@/config/site.config'
+import { dashboardRouteForRole, NAV_LINKS, ROUTES } from '@/config/site.config'
 import { cn } from '@/lib/cn'
 import { useAuth } from '@/features/auth/AuthContext'
 
@@ -29,7 +29,7 @@ export function Navbar({ overHero = false }: { overHero?: boolean }) {
   const { usuario } = useAuth()
 
   // Con sesión abierta no tiene sentido ofrecer "Iniciar sesión"
-  const panel = usuario?.rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante
+  const panel = usuario ? dashboardRouteForRole(usuario.rol) : ROUTES.appSolicitante
 
   // Velo degradado solo mientras estamos arriba del hero
   const conVelo = overHero && !scrolled

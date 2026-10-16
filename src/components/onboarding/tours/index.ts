@@ -6,8 +6,9 @@ import { REGISTER_TOUR } from './register.tour'
 import { SEEKER_TOUR } from './seeker.tour'
 import { WORKER_TOUR } from './worker.tour'
 import { MATCHING_TOUR } from './matching.tour'
+import { MODULE_TOUR } from './module.tour'
 
-export { HOME_TOUR, LOGIN_TOUR, ROLE_TOUR, REGISTER_TOUR, SEEKER_TOUR, WORKER_TOUR, MATCHING_TOUR }
+export { HOME_TOUR, LOGIN_TOUR, ROLE_TOUR, REGISTER_TOUR, SEEKER_TOUR, WORKER_TOUR, MATCHING_TOUR, MODULE_TOUR }
 
 /**
  * Registro central de guías. La clave es el id que se pasa a `useAutoTour`
@@ -21,6 +22,9 @@ export const TOURS: Record<string, TourStep[]> = {
   solicitante: SEEKER_TOUR,
   helpworker: WORKER_TOUR,
   matching: MATCHING_TOUR,
+  'modulo-solicitante': MODULE_TOUR,
+  'modulo-proveedor': MODULE_TOUR,
+  'modulo-administrador': MODULE_TOUR,
 }
 
 export type TourId = keyof typeof TOURS

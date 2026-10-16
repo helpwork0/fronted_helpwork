@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Minus, Send, X, Smile } from 'lucide-react'
+import { LoaderCircle, Minus, Send, X, Smile } from 'lucide-react'
 import { useMessages } from './MessagesContext'
 import type { Conversacion } from '@/types'
 import { cn } from '@/lib/cn'
@@ -29,7 +29,7 @@ export function ChatDock() {
 }
 
 function VentanaChat({ conv }: { conv: Conversacion }) {
-  const { cerrarChat, alternarMinimizado, minimizados, enviar } = useMessages()
+  const { cerrarChat, alternarMinimizado, minimizados, enviar, cargandoConversacion } = useMessages()
   const [texto, setTexto] = useState('')
   const finLista = useRef<HTMLDivElement>(null)
   const minimizado = minimizados.includes(conv.id)
@@ -97,8 +97,10 @@ function VentanaChat({ conv }: { conv: Conversacion }) {
             )}
 
             {/* Mensajes */}
-            <div className="flex h-[300px] flex-col gap-1.5 overflow-y-auto px-3 py-3">
+            <div className="relative flex h-[300px] flex-col gap-1.5 overflow-y-auto px-3 py-3">
+              {cargandoConversacion === conv.id && <div className="absolute inset-0 z-10 grid place-items-center bg-white/65 text-brand-600 backdrop-blur-[1px]"><LoaderCircle className="animate-spin" size={21} /></div>}
               {conv.mensajes.map((m, i) => {
+                if (m.autor === 'sistema') return <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="my-2 rounded-xl border border-brand-100 bg-brand-50/75 px-2.5 py-2 text-center text-[11px] leading-relaxed text-ink-soft">{m.texto}</motion.div>
                 const mio = m.autor === 'yo'
                 const seguido = i > 0 && conv.mensajes[i - 1].autor === m.autor
                 return (
@@ -138,7 +140,7 @@ function VentanaChat({ conv }: { conv: Conversacion }) {
               <input
                 value={texto}
                 onChange={e => setTexto(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') mandar() }}
+                maxLength={100} onKeyDown={e => { if (e.key === 'Enter') mandar() }}
                 placeholder="Escribe un mensaje..."
                 className="min-w-0 flex-1 rounded-full bg-black/[.04] px-3.5 py-2 text-[13.5px] outline-none transition focus:bg-black/[.06] placeholder:text-ink-muted/80"
               />

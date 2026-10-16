@@ -1,88 +1,27 @@
-import { motion } from 'framer-motion'
-import { Calendar, DollarSign } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Calendar, Check, DollarSign, SlidersHorizontal, Sparkles, X } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
-import { TRABAJOS, type Trabajo } from '@/data/appData'
-import { useMessages } from '@/features/messages/MessagesContext'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/cn'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import type { ApiProviderJob } from '@/lib/api/helpwork.types'
 
-const COLUMNAS = [
-  { id: 'propuesta', titulo: 'Propuestas enviadas', color: 'bg-black/[.06] text-ink-soft' },
-  { id: 'en_curso',  titulo: 'En curso',            color: 'bg-brand-50 text-brand-600' },
-  { id: 'entregado', titulo: 'Entregados',          color: 'bg-amber-100 text-amber-500' },
-  { id: 'pagado',    titulo: 'Pagados',             color: 'bg-success-100 text-success-500' },
-] as const
+const COLUMNAS = [{ id: 'in_conversation', titulo: 'En conversación', color: 'bg-violet-100 text-violet-700' }, { id: 'in_progress', titulo: 'En curso', color: 'bg-brand-50 text-brand-600' }, { id: 'delivered', titulo: 'Entregados', color: 'bg-amber-100 text-amber-600' }, { id: 'paid', titulo: 'Pagados', color: 'bg-success-100 text-success-600' }] as const
+const label: Record<ApiProviderJob['status'], string> = { in_conversation: 'En conversación', in_progress: 'En curso', delivered: 'Entregado', paid: 'Pagado' }
+const date = (iso?: string | null) => iso ? new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(new Date(iso)) : 'Sin fecha límite'
 
-/** Tablero tipo kanban: cada columna es un estado del trabajo. */
 export default function JobsPage() {
-  const { abrirChat } = useMessages()
-
-  return (
-    <div>
-      <PageHeader titulo="Mis trabajos" descripcion="En qué estado está cada compromiso que tienes." />
-
-      <div className="grid gap-4 lg:grid-cols-4">
-        {COLUMNAS.map((col, ci) => {
-          const items = TRABAJOS.filter(t => t.estado === col.id)
-          return (
-            <motion.section
-              key={col.id}
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: ci * 0.08, duration: 0.45 }}
-              className="panel flex flex-col p-3"
-            >
-              <header className="mb-3 flex items-center justify-between px-1">
-                <h2 className="text-[14px] font-bold">{col.titulo}</h2>
-                <span className={cn('rounded-full px-2 py-0.5 text-[11.5px] font-bold', col.color)}>{items.length}</span>
-              </header>
-
-              <div className="flex flex-col gap-2.5">
-                {items.map(t => <TarjetaTrabajo key={t.id} t={t} onChat={() => abrirChat('cv1')} />)}
-                {items.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-white/80 px-3 py-6 text-center text-[12.5px] texto-suave">
-                    Sin trabajos aquí
-                  </p>
-                )}
-              </div>
-            </motion.section>
-          )
-        })}
-      </div>
-    </div>
-  )
+  const [jobs, setJobs] = useState<ApiProviderJob[]>([]); const [loading, setLoading] = useState(true); const [editing, setEditing] = useState<ApiProviderJob | null>(null)
+  const load = useCallback(async () => { try { setJobs(await http.get<ApiProviderJob[]>(ENDPOINTS.propuestas.jobs)) } finally { setLoading(false) } }, [])
+  useEffect(() => { http.patch(ENDPOINTS.propuestas.jobsSeen).then(() => window.dispatchEvent(new Event('helpwork:propuestas-actualizadas'))).catch(() => undefined); load().catch(() => undefined) }, [load])
+  const update = async (job: ApiProviderJob, patch: { status?: ApiProviderJob['status']; progressPercentage?: number }) => { await http.patch(ENDPOINTS.propuestas.job(job.id), patch); await load(); setEditing(null) }
+  return <div><PageHeader titulo="Mis trabajos" descripcion="Actualiza manualmente el avance y estado de cada compromiso aceptado." />
+    {loading ? <div className="panel grid min-h-52 place-items-center"><span className="h-8 w-8 animate-spin rounded-full border-4 border-brand-100 border-t-brand-600" /></div> : !jobs.length ? <div className="panel"><EmptyState titulo="Aún no tienes trabajos" texto="Aquí aparecerán las propuestas que tus HelpSeekers acepten." /></div> : <div className="grid gap-4 lg:grid-cols-3">{COLUMNAS.map((col, ci) => { const items = jobs.filter(job => job.status === col.id); return <motion.section key={col.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ci * .08 }} className="panel flex min-h-64 flex-col p-3"><header className="mb-3 flex items-center justify-between px-1"><h2 className="text-[14px] font-bold">{col.titulo}</h2><span className={cn('rounded-full px-2 py-.5 text-[11.5px] font-bold', col.color)}>{items.length}</span></header><div className="space-y-2.5">{items.map(job => <JobCard key={job.id} job={job} onEdit={() => setEditing(job)} />)}{!items.length && <p className="rounded-xl border border-dashed border-white/80 px-3 py-6 text-center text-[12.5px] texto-suave">Sin trabajos aquí</p>}</div></motion.section> })}</div>}
+    {editing && <JobEditor job={editing} onClose={() => setEditing(null)} onSave={patch => update(editing, patch).catch(() => undefined)} />}
+  </div>
 }
-
-function TarjetaTrabajo({ t, onChat }: { t: Trabajo; onChat: () => void }) {
-  return (
-    <motion.article
-      whileHover={{ y: -3 }}
-      className="cursor-pointer rounded-xl2 border border-white/70 bg-white/70 p-3.5 transition-shadow hover:shadow-soft"
-    >
-      <h3 className="text-[14px] font-bold leading-snug">{t.titulo}</h3>
-
-      <div className="mt-2 flex items-center gap-2">
-        <img src={t.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
-        <span className="truncate text-[12.5px] texto-suave">{t.cliente}</span>
-      </div>
-
-      {t.progreso > 0 && t.progreso < 100 && (
-        <div className="mt-3">
-          <div className="h-1.5 overflow-hidden rounded-full bg-black/[.07]">
-            <motion.div className="h-full rounded-full bg-brand-500"
-              initial={{ width: 0 }} animate={{ width: `${t.progreso}%` }} transition={{ duration: 1, ease: 'easeOut' }} />
-          </div>
-          <p className="mt-1 text-[11.5px] text-ink-muted">{t.progreso}% completado</p>
-        </div>
-      )}
-
-      <div className="mt-3 flex items-center justify-between border-t border-white/70 pt-2.5 text-[12px]">
-        <span className="inline-flex items-center gap-1 texto-suave"><Calendar size={12} /> {t.entrega}</span>
-        <span className="inline-flex items-center gap-0.5 font-bold"><DollarSign size={12} />{t.monto}</span>
-      </div>
-
-      <Button size="sm" variant="secondary" fullWidth className="mt-2.5" onClick={e => { e.stopPropagation(); onChat() }}>
-        Abrir chat
-      </Button>
-    </motion.article>
-  )
-}
+function JobCard({ job, onEdit }: { job: ApiProviderJob; onEdit: () => void }) { const title = job.service_requests?.description_free?.slice(0, 68) || 'Trabajo acordado'; const conversacion = job.status === 'in_conversation'; return <article className="rounded-xl2 border border-white/70 bg-white/70 p-3.5"><h3 className="line-clamp-2 text-[14px] font-bold leading-snug">{title}</h3><div className="mt-2 flex items-center gap-2">{job.users?.avatar_url ? <img src={job.users.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover" /> : <span className="h-6 w-6 rounded-full bg-brand-50" />}<span className="truncate text-[12.5px] texto-suave">{job.users?.full_name || 'HelpSeeker'}</span></div>{conversacion ? <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-[12px] text-violet-700">Aún están definiendo el trabajo. El avance se habilita al cerrar la conversación.</p> : <div className="mt-3"><div className="h-1.5 overflow-hidden rounded-full bg-black/[.07]"><motion.div className="h-full rounded-full bg-brand-500" initial={{ width: 0 }} animate={{ width: `${job.progress_percentage}%` }} /></div><p className="mt-1 text-[11.5px] text-ink-muted">{job.progress_percentage}% completado · {label[job.status]}</p></div>}<div className="mt-3 flex items-center justify-between border-t border-white/70 pt-2.5 text-[12px]"><span className="inline-flex items-center gap-1 texto-suave"><Calendar size={12} /> {date(job.service_requests?.expires_at)}</span><span className="inline-flex items-center gap-.5 font-bold"><DollarSign size={12} />{job.proposals?.amount ?? '—'}</span></div><Button size="sm" variant="secondary" fullWidth className="mt-2.5" onClick={onEdit}>{conversacion ? 'Conversación cerrada' : <><SlidersHorizontal size={14} /> Actualizar</>}</Button></article> }
+function JobEditor({ job, onClose, onSave }: { job: ApiProviderJob; onClose: () => void; onSave: (patch: { status: ApiProviderJob['status']; progressPercentage: number }) => void }) { const [progress, setProgress] = useState(job.progress_percentage); const [status, setStatus] = useState(job.status); const [celebrating, setCelebrating] = useState(false); const conversational = job.status === 'in_conversation'; const save = () => { setCelebrating(true); window.setTimeout(() => onSave({ status: conversational ? 'in_progress' : status, progressPercentage: conversational ? 0 : progress }), 620) }; return <div onMouseDown={onClose} className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/30 p-5 backdrop-blur-md"><motion.div onMouseDown={event => event.stopPropagation()} initial={{ opacity: 0, y: 15, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="relative w-full max-w-md overflow-hidden rounded-[28px] border border-white/80 bg-white/95 p-6 shadow-2xl"><div className="flex items-center justify-between"><h2 className="font-display text-lg font-extrabold">{conversational ? 'Cerrar conversación' : 'Actualizar trabajo'}</h2><button onClick={onClose} className="rounded-full p-2 hover:bg-brand-50"><X size={18} /></button></div>{conversational ? <p className="mt-4 text-sm leading-relaxed texto-suave">Al confirmar, este acuerdo pasará a <b>En curso</b> y podrás registrar su avance.</p> : <><p className="mt-4 text-sm font-semibold">Avance: <motion.span key={progress} initial={{ scale: .75, opacity: .4 }} animate={{ scale: 1, opacity: 1 }} className="inline-block text-brand-600">{progress}%</motion.span></p><input className="mt-2 w-full accent-brand-600" type="range" min="0" max="100" step="1" value={progress} onChange={event => setProgress(Number(event.target.value))} /><div className="mt-5"><p className="text-sm font-semibold">Estado</p><div className="mt-2 grid grid-cols-3 gap-2">{(['in_progress', 'delivered', 'paid'] as const).map(option => <motion.button whileTap={{ scale: .94 }} key={option} onClick={() => setStatus(option)} className={cn('rounded-xl border px-2 py-2 text-[12px] font-semibold transition', status === option ? 'border-brand-300 bg-brand-50 text-brand-700 shadow-sm' : 'border-surface-line bg-white text-ink-soft hover:bg-brand-50/50')}>{label[option]}</motion.button>)}</div></div></>}<Button fullWidth className="mt-6" onClick={save} disabled={celebrating}>{celebrating ? <><Check size={16} /> Guardado</> : conversational ? 'Conversación cerrada' : 'Guardar avance'}</Button><AnimatePresence>{celebrating && <motion.div initial={{ opacity: 0, scale: .4 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="pointer-events-none absolute inset-0 grid place-items-center bg-white/55 backdrop-blur-sm"><motion.div initial={{ scale: .5, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="relative grid h-24 w-24 place-items-center rounded-full bg-brand-600 text-white shadow-xl"><Check size={42}/>{[0, 1, 2, 3, 4, 5].map(i => <motion.span key={i} initial={{ opacity: 0, x: 0, y: 0 }} animate={{ opacity: [0, 1, 0], x: Math.cos(i * 1.05) * 66, y: Math.sin(i * 1.05) * 66 }} transition={{ duration: .58, delay: .05 }} className="absolute"><Sparkles size={16} className="text-brand-400" /></motion.span>)}</motion.div></motion.div>}</AnimatePresence></motion.div></div> }

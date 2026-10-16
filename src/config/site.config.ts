@@ -18,9 +18,22 @@ export const ROUTES = {
   oportunidades: '/app/helpworker/oportunidades', matchingHW: '/app/helpworker/matching', trabajos: '/app/helpworker/trabajos', calendario: '/app/helpworker/calendario', resenas: '/app/helpworker/resenas', perfil: '/app/helpworker/perfil', ganancias: '/app/helpworker/ganancias', mensajes: '/app/helpworker/mensajes', notificaciones: '/app/helpworker/notificaciones', ajustes: '/app/helpworker/ajustes', ayuda: '/app/helpworker/ayuda',
   // --- Faceta solicitante exclusiva del HelpWorker con doble rol ---
   proveedorSolicitudes: '/app/helpworker/solicitante/solicitudes', proveedorNuevaSolicitud: '/app/helpworker/solicitante/solicitudes/nueva', proveedorMatchingSolicitudes: '/app/helpworker/solicitante/matching', proveedorPropuestas: '/app/helpworker/solicitante/propuestas', proveedorFavoritos: '/app/helpworker/solicitante/favoritos',
-  // --- Administrador (estructura preparada; módulos administrativos después) ---
+  // --- Administrador ---
   appAdministrador: '/app/administrador',
+  adminSaludMercado: '/app/administrador/salud-mercado',
+  adminMensajesArchivados: '/app/administrador/mensajes-archivados',
+  adminOperacion: '/app/administrador/operacion',
+  adminMarketplace: '/app/administrador/marketplace',
+  adminAvanzado: '/app/administrador/avanzado',
+  adminRecuperacion: '/app/administrador/recuperacion',
+  adminSolicitudes: '/app/administrador/solicitudes',
 } as const
+
+/** Punto de entrada único por rol: impide que administración caiga en solicitante. */
+export function dashboardRouteForRole(role: 'solicitante' | 'helpworker' | 'administrador') {
+  if (role === 'administrador') return ROUTES.appAdministrador
+  return role === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante
+}
 
 export const NAV_LINKS = [
   { label: 'Cómo funciona', href: '#como-funciona' },

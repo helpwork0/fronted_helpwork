@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, LifeBuoy, BookOpen, MessageCircle, Search } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -8,14 +8,24 @@ import { FAQ } from '@/data/appData'
 import { useMessages } from '@/features/messages/MessagesContext'
 import { useReplayTour } from '@/components/onboarding/useAutoTour'
 import { cn } from '@/lib/cn'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
 
 export default function HelpPage() {
   const [abierta, setAbierta] = useState<number | null>(0)
   const [q, setQ] = useState('')
   const { abrirChat } = useMessages()
   const repetirGuia = useReplayTour('solicitante')
+  const [preguntas, setPreguntas] = useState<Array<{ p: string; r: string }>>(FAQ)
+  useEffect(() => {
+    http.get<Array<{ content_key: string; content_type: string; title: string; body: string }>>(ENDPOINTS.contenido.publico())
+      .then(items => {
+        const cmsFaq = items.filter(item => item.content_type === 'faq' || item.content_key.startsWith('faq_')).map(item => ({ p: item.title, r: item.body }))
+        if (cmsFaq.length) setPreguntas(cmsFaq)
+      }).catch(() => undefined)
+  }, [])
 
-  const lista = FAQ.filter(f => (f.p + f.r).toLowerCase().includes(q.toLowerCase()))
+  const lista = preguntas.filter(f => (f.p + f.r).toLowerCase().includes(q.toLowerCase()))
 
   return (
     <div className="mx-auto max-w-4xl">

@@ -72,7 +72,7 @@ export interface Plan {
 export interface Mensaje {
   id: string
   /** 'yo' = lo escribió la persona que usa la app. */
-  autor: 'yo' | 'otro'
+  autor: 'yo' | 'otro' | 'sistema'
   texto: string
   hora: string
 }

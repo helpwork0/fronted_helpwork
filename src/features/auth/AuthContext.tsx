@@ -10,7 +10,7 @@ interface AuthContextValue {
   usuario: Sesion | null
   cargandoSesion: boolean
   login: (datos: { email: string; password: string }) => Promise<Sesion>
-  registrar: (datos: { nombre: string; email: string; password: string; rol: UserRole }) => Promise<{ sesion: Sesion | null; emailConfirmationRequired: boolean }>
+  registrar: (datos: { nombre: string; email: string; password: string; rol: UserRole; city?: string; university?: string; termsAccepted?: boolean }) => Promise<{ sesion: Sesion | null; emailConfirmationRequired: boolean }>
   completarOAuth: (tokens: { accessToken: string; refreshToken?: string; expiresIn?: number; rol?: UserRole }) => Promise<Sesion>
   refrescarSesion: () => Promise<Sesion | null>
   logout: () => Promise<void>
@@ -37,8 +37,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return sesion
   }, [])
 
-  const registrar = useCallback(async ({ nombre, email, password, rol }: { nombre: string; email: string; password: string; rol: UserRole }) => {
-    const response = await http.post<AuthResponse>(ENDPOINTS.auth.register, { fullName: nombre, email, password, role: rolApi(rol) })
+  const registrar = useCallback(async ({ nombre, email, password, rol, city, university, termsAccepted }: { nombre: string; email: string; password: string; rol: UserRole; city?: string; university?: string; termsAccepted?: boolean }) => {
+    const response = await http.post<AuthResponse>(ENDPOINTS.auth.register, { fullName: nombre, email, password, role: rolApi(rol), city, university, termsAccepted })
     if (response.emailConfirmationRequired) return { sesion: null, emailConfirmationRequired: true }
     const sesion = userFromApi(response, true)
     setUsuario(sesion)

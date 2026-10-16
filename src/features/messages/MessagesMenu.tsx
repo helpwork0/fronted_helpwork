@@ -98,11 +98,11 @@ export function MessagesMenu() {
                           {c.nombre}
                         </p>
                         <p className={cn('truncate text-[13px]', c.noLeidos ? 'font-medium text-ink' : 'texto-suave')}>
-                          {ultimo.autor === 'yo' && 'Tú: '}{ultimo.texto}
+                          {ultimo ? <>{ultimo.autor === 'yo' && 'Tú: '}{ultimo.texto}</> : 'Sin mensajes aún'}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
-                        <span className="text-[11.5px] text-ink-muted">{ultimo.hora}</span>
+                        <span className="text-[11.5px] text-ink-muted">{ultimo?.hora ?? ''}</span>
                         {c.noLeidos > 0 && <span className="h-2.5 w-2.5 rounded-full bg-brand-500" />}
                       </div>
                     </button>

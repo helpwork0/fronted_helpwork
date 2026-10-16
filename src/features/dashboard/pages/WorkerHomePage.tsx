@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Briefcase, ShieldCheck, DollarSign, Star, MapPin, Clock,
@@ -8,8 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { AnimatedNumber } from '../components/AnimatedNumber'
 import { ProgressRing } from '../components/ProgressRing'
 import { Mascot } from '@/components/mascot/Mascot'
-import { OPORTUNIDADES } from '@/data/mock'
-import { TRABAJOS, EVENTOS, RESENAS, HELPSEEKERS_ACTIVOS } from '@/data/appData'
+import { EVENTOS, RESENAS } from '@/data/appData'
 import { PresenceList } from '../components/PresenceList'
 import { TERMINOS } from '@/config/site.config'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -18,6 +18,15 @@ import { staggerContainer, fadeUp } from '@/lib/motion/variants'
 import { useAutoTour } from '@/components/onboarding/useAutoTour'
 import { ROUTES } from '@/config/site.config'
 import { cn } from '@/lib/cn'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import type { ApiProviderCompatibleRequest, ApiProviderJob } from '@/lib/api/helpwork.types'
+import { CmsAnnouncements } from '../components/CmsAnnouncements'
+
+function truncarRecomendacion(texto: string, maximo = 60) {
+  const limpio = texto.trim()
+  return limpio.length > maximo ? `${limpio.slice(0, maximo).trimEnd()}…` : limpio
+}
 
 /** Panel del HelpWorker, con la misma estética de cristal que el del solicitante. */
 export default function WorkerHomePage() {
@@ -28,7 +37,22 @@ export default function WorkerHomePage() {
   const hora = new Date().getHours()
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
   const nombre = usuario?.nombre.split(' ')[0] ?? 'Joaquín'
-  const enCurso = TRABAJOS.filter(t => t.estado === 'en_curso')
+  const [oportunidades, setOportunidades] = useState<ApiProviderCompatibleRequest[]>([])
+  const [trabajos, setTrabajos] = useState<ApiProviderJob[]>([])
+  const [cargandoDatos, setCargandoDatos] = useState(true)
+
+  useEffect(() => {
+    let activo = true
+    Promise.all([
+      http.get<ApiProviderCompatibleRequest[]>(ENDPOINTS.matching.providerCompatibleRequests),
+      http.get<ApiProviderJob[]>(ENDPOINTS.propuestas.jobs),
+    ]).then(([compatibles, jobs]) => {
+      if (!activo) return
+      setOportunidades(compatibles)
+      setTrabajos(jobs)
+    }).catch(() => { if (activo) { setOportunidades([]); setTrabajos([]) } }).finally(() => { if (activo) setCargandoDatos(false) })
+    return () => { activo = false }
+  }, [])
 
   return (
     <motion.div variants={staggerContainer(0.07)} initial="hidden" animate="show" className="space-y-5">
@@ -55,12 +79,14 @@ export default function WorkerHomePage() {
         </div>
       </motion.section>
 
+      <motion.div variants={fadeUp}><CmsAnnouncements /></motion.div>
+
       {/* ---------- Métricas ---------- */}
       <motion.section variants={staggerContainer(0.06)} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metrica icon={Briefcase}   label="Oportunidades hoy" valor={12} sufijo=" / 15" tono="brand" />
-        <Metrica icon={ShieldCheck} label="Tasa de respuesta" valor={92} sufijo="%" tono="success" />
-        <Metrica icon={DollarSign}  label="Ganado este mes" valor={680} prefijo="$" tono="violet" />
-        <Metrica icon={Star}        label="Calificación" valor={4.9} decimales={1} tono="amber" />
+        <Metrica icon={Briefcase}   label="Solicitudes compatibles" valor={oportunidades.length} tono="brand" />
+        <Metrica icon={ShieldCheck} label="Trabajos activos" valor={trabajos.filter(job => !['delivered', 'paid'].includes(job.status)).length} tono="success" />
+        <Metrica icon={DollarSign}  label="Trabajos aceptados" valor={trabajos.length} tono="violet" />
+        <Metrica icon={Star}        label="En conversación" valor={trabajos.filter(job => job.status === 'in_conversation').length} tono="amber" />
       </motion.section>
 
       <div className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
@@ -72,37 +98,39 @@ export default function WorkerHomePage() {
           </header>
 
           <div className="space-y-2.5">
-            {OPORTUNIDADES.map((o, i) => (
+            {oportunidades.map((o, i) => (
               <motion.article
-                key={o.id}
+                key={o.request_id}
                 variants={fadeUp}
                 whileHover={{ x: 4 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 26 }}
                 className="group flex cursor-pointer items-center gap-4 rounded-xl2 border border-white/70 bg-white/55 p-3.5 transition-colors hover:bg-white/85"
               >
-                <img src={o.avatarUrl} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />
+                {o.requester?.avatar_url ? <img src={o.requester.avatar_url} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-600"><Users size={19} /></div>}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="truncate text-[15px] font-bold">{o.titulo}</h3>
-                    {o.urgente && <Badge tone="amber">Urgente</Badge>}
+                    <h3 className="max-w-[320px] truncate text-[15px] font-bold" title={o.service_request?.description_free || 'Solicitud compatible'}>{truncarRecomendacion(o.service_request?.description_free || 'Solicitud compatible')}</h3>
+                    <Badge tone="brand">Top {o.rank_position}</Badge>
                   </div>
                   <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] texto-suave">
-                    <span className="inline-flex items-center gap-1"><MapPin size={11} /> {o.modalidad}</span>
-                    <span className="inline-flex items-center gap-1"><Clock size={11} /> {o.publicadoHace}</span>
+                    <span className="inline-flex items-center gap-1"><MapPin size={11} /> {o.service_request?.city || o.service_request?.modality || 'Online'}</span>
+                    <span className="inline-flex items-center gap-1"><Clock size={11} /> {o.service_request?.academic_level || 'Nivel académico'}</span>
                   </div>
                 </div>
                 <p className="hidden shrink-0 text-[15px] font-bold sm:block">
-                  ${o.precio}<span className="text-[12px] font-normal text-ink-muted">/{o.unidad}</span>
+                  {o.requester?.full_name || 'HelpSeeker'}
                 </p>
                 <div className="shrink-0 text-center">
                   <p className="text-[15px] font-extrabold text-success-500">
-                    <AnimatedNumber valor={o.match} sufijo="%" duracion={900 + i * 140} />
+                    <AnimatedNumber valor={Math.round(Number(o.matching?.distribution_score ?? o.matching?.reciprocal_score ?? 0))} sufijo="%" duracion={900 + i * 140} />
                   </p>
                   <p className="text-[10.5px] text-ink-muted">match</p>
                 </div>
                 <ArrowRight size={16} className="shrink-0 text-ink-muted transition-transform group-hover:translate-x-1 group-hover:text-brand-600" />
               </motion.article>
             ))}
+            {!cargandoDatos && !oportunidades.length && <p className="py-8 text-center text-sm texto-suave">No tienes solicitudes compatibles por ahora.</p>}
+            {cargandoDatos && <p className="py-8 text-center text-sm texto-suave">Cargando solicitudes compatibles…</p>}
           </div>
         </motion.section>
 
@@ -115,16 +143,17 @@ export default function WorkerHomePage() {
               <Button variant="ghost" size="sm" to={ROUTES.trabajos}>Ver todos</Button>
             </header>
             <div className="space-y-3">
-              {enCurso.map(t => (
+              {trabajos.filter(t => !['delivered', 'paid'].includes(t.status)).map(t => (
                 <div key={t.id} className="flex items-center gap-3.5 rounded-xl2 border border-white/70 bg-white/55 p-3">
-                  <ProgressRing valor={t.progreso} tamano={46} color="#2563EB" />
+                  <ProgressRing valor={t.progress_percentage} tamano={46} color="#2563EB" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-bold">{t.titulo}</p>
-                    <p className="truncate text-[12.5px] texto-suave">{t.cliente} · entrega {t.entrega}</p>
+                    <p className="max-w-[300px] truncate text-[14px] font-bold" title={t.service_requests?.description_free || 'Trabajo aceptado'}>{truncarRecomendacion(t.service_requests?.description_free || 'Trabajo aceptado')}</p>
+                    <p className="truncate text-[12.5px] texto-suave">{t.users?.full_name || 'HelpSeeker'} · {t.status}</p>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => abrirChat('cv1')}>Chat</Button>
                 </div>
               ))}
+              {!cargandoDatos && !trabajos.length && <p className="py-5 text-center text-sm texto-suave">Aún no tienes trabajos aceptados.</p>}
             </div>
           </motion.section>
 
@@ -159,7 +188,7 @@ export default function WorkerHomePage() {
       <motion.div variants={fadeUp}>
         <PresenceList
           titulo={`${TERMINOS.solicitante.plural} buscando ayuda ahora`}
-          gente={HELPSEEKERS_ACTIVOS}
+          gente={oportunidades.slice(0, 5).map((o) => ({ id: o.request_id, nombre: o.requester?.full_name || 'HelpSeeker', avatarUrl: o.requester?.avatar_url || 'https://via.placeholder.com/96', detalle: o.service_request?.description_free || 'Solicitud compatible', etiqueta: `${Math.round(Number(o.matching?.distribution_score ?? 0))}% match`, estado: 'en_linea' as const }))}
           textoBoton="Proponer"
           onAccion={() => abrirChat('cv1')}
           verTodos={ROUTES.oportunidades}

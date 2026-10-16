@@ -11,22 +11,50 @@ export interface AuthResponse { usuario: ApiUser; roles: string[]; emailConfirma
 
 export interface ApiProfileBundle {
   usuario: ApiUser; roles: string[]
-  perfilSolicitante?: { city?: string | null; academic_program?: string | null; academic_level?: string | null; preferred_languages?: string[] | null } | null
-  perfilProveedor?: { display_name?: string | null; city?: string | null; average_rating?: number | null; review_count?: number | null; status?: string | null } | null
+  perfilSolicitante?: { city?: string | null; university?: string | null; academic_program?: string | null; academic_level?: string | null; preferred_languages?: string[] | null } | null
+  perfilProveedor?: { display_name?: string | null; city?: string | null; university?: string | null; average_rating?: number | null; review_count?: number | null; status?: string | null } | null
 }
 
 export interface ApiProviderService {
-  id?: string; field_code: string; topic_codes: string[]; service_type_code: string; academic_levels: string[]; modalities: string[]; languages: string[]
+  id?: string; active?: boolean; field_code: string; topic_codes: string[]; service_type_code: string; academic_levels: string[]; modalities: string[]; languages: string[]
+  help_type_codes?: string[]; format_codes?: string[]
+  field_name?: string; topics_detail?: { code: string; name: string }[]
   price_min?: number | null; price_max?: number | null; specialization_score?: number | null; opportunity_interest_score?: number | null; semantic_score?: number | null; excluded_topic_codes?: string[]
 }
 export interface ApiProviderAvailability { availability_status?: string; timezone?: string; weekly_slots?: { dia: number; inicio: string; fin: string }[]; hours_per_week?: number; committed_hours?: number; max_concurrent_services?: number; response_window_minutes?: number }
-export interface ApiPublicProviderProfile { usuario: { id: string; full_name?: string; avatar_url?: string | null }; perfilProveedor: { user_id: string; display_name?: string | null; city?: string | null; average_rating?: number | null; review_count?: number | null }; servicios: ApiProviderService[]; disponibilidad: ApiProviderAvailability | null }
+export interface ApiPublicProviderProfile { usuario: { id: string; full_name?: string; avatar_url?: string | null }; perfilProveedor: { user_id: string; display_name?: string | null; city?: string | null; university?: string | null; average_rating?: number | null; review_count?: number | null }; servicios: ApiProviderService[]; disponibilidad: ApiProviderAvailability | null }
 export interface ApiFavoriteProvider { provider_id: string; created_at: string; perfil: ApiPublicProviderProfile }
-export interface ApiPublicRequesterProfile { usuario: { id: string; full_name?: string; avatar_url?: string | null }; perfilSolicitante: { user_id: string; city?: string | null; academic_program?: string | null; academic_level?: string | null; preferred_languages?: string[] | null; average_rating?: number | null; review_count?: number | null } | null }
+export interface ApiPublicRequesterProfile { usuario: { id: string; full_name?: string; avatar_url?: string | null }; perfilSolicitante: { user_id: string; city?: string | null; university?: string | null; academic_program?: string | null; academic_level?: string | null; preferred_languages?: string[] | null; average_rating?: number | null; review_count?: number | null } | null }
 export interface ApiReview { id: string; request_id?: string; reviewer_id?: string; rating: number; comment?: string | null; created_at: string; users?: { full_name?: string; avatar_url?: string | null } | null }
 export interface ApiBlock { blocked_id: string; reason?: string | null; created_at: string; users?: { full_name?: string; avatar_url?: string | null } | null }
 export interface ApiTask { id: string; title: string; description?: string | null; task_type: string; status: 'pending' | 'queued' | 'processing' | 'completed' | 'failed'; scheduled_for: string; completed_at?: string | null; last_error?: string | null }
 export interface ApiProviderOpportunity { id: string; request_id: string; status: string; rank_position: number; created_at: string; matching?: { distribution_score?: number; reciprocal_score?: number } | null; requester?: { id: string; full_name?: string; avatar_url?: string | null } | null; service_requests?: { field_code?: string; service_type_code?: string; academic_level?: string; modality?: string; city?: string | null; budget_min?: number | null; budget_max?: number | null; expires_at?: string | null; status?: string; description_free?: string | null } | null }
+
+export interface ApiProviderCompatibleRequest {
+  rank_position: number; request_id: string
+  proposal_status?: 'pending' | 'accepted' | 'rejected' | null
+  matching: { distribution_score?: number; reciprocal_score?: number; score_components?: Record<string, number> }
+  requester?: { id: string; full_name?: string; avatar_url?: string | null } | null
+  service_request?: { field_code?: string; service_type_code?: string; academic_level?: string; modality?: string; city?: string | null; budget_min?: number | null; budget_max?: number | null; needed_at?: string | null; expires_at?: string | null; status?: string; description_free?: string | null; request_topics?: { topic_code: string }[] } | null
+}
+
+export interface ApiProposal {
+  id: string; request_id: string; provider_id: string; requester_id: string; amount: number; description?: string | null
+  status: 'pending' | 'accepted' | 'rejected'; created_at: string; responded_at?: string | null; conversation_id?: string
+  provider_profiles?: { display_name?: string | null; average_rating?: number | null; review_count?: number | null; city?: string | null } | null
+  service_requests?: { description_free?: string | null; service_type_code?: string | null; status?: string | null; expires_at?: string | null } | null
+  users?: { id?: string; full_name?: string | null; avatar_url?: string | null } | null
+}
+
+export interface ApiSavedRequest {
+  request_id: string; created_at: string
+  proposal_status?: 'pending' | 'accepted' | 'rejected' | null
+  requester?: { id: string; full_name?: string; avatar_url?: string | null } | null
+  service_requests?: ApiProviderCompatibleRequest['service_request']
+}
+export interface ApiProviderJob { id: string; status: 'in_conversation' | 'in_progress' | 'delivered' | 'paid'; progress_percentage: number; request_id: string; proposals?: { amount?: number | null; description?: string | null } | null; service_requests?: { description_free?: string | null; expires_at?: string | null } | null; users?: { full_name?: string | null; avatar_url?: string | null } | null }
+export interface ApiConversation { id: string; job_id: string; provider_id: string; requester_id: string; last_message_at: string; counterpart?: { id: string; full_name?: string | null; avatar_url?: string | null } | null; unread_count: number; last_message?: { id: string; body: string; created_at: string; sender_id: string | null; is_system?: boolean } | null; provider_jobs?: { request_id?: string; service_requests?: { description_free?: string | null } | null } | null }
+export interface ApiDirectMessage { id: string; sender_id: string | null; body: string; created_at: string; is_system?: boolean }
 
 export const roleFromApi = (roles: string[]): UserRole => roles.includes('admin') ? 'administrador' : roles.includes('provider') ? 'helpworker' : 'solicitante'
 

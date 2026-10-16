@@ -17,7 +17,7 @@ export default function NotificationsPage() {
   const [items, setItems] = useState<Notificacion[]>([]); const [tab, setTab] = useState('todas'); const [offset, setOffset] = useState(0); const [hasMore, setHasMore] = useState(false); const [loading, setLoading] = useState(true)
   const cargar = async (nextOffset = 0, append = false) => {
     const page = await http.get<{ items: ApiNotification[]; pagination: { hasMore: boolean } }>(ENDPOINTS.notificaciones.list(20, nextOffset))
-    const mapped: Notificacion[] = page.items.map(item => ({ id: String(item.id), texto: item.mensaje || item.titulo, hace: new Date(item.fecha).toLocaleString('es-EC'), leida: item.leido, tipo: item.tipo === 'new_match' ? 'propuesta' : 'sistema' }))
+    const mapped: Notificacion[] = page.items.map(item => ({ id: String(item.id), texto: item.mensaje || item.titulo, hace: new Date(item.fecha).toLocaleString('es-EC'), leida: item.leido, tipo: item.tipo === 'new_match' || item.tipo === 'proposal_received' || item.tipo === 'proposal_status_changed' ? 'propuesta' : 'sistema' }))
     setItems(current => append ? [...current, ...mapped] : mapped); setOffset(nextOffset + mapped.length); setHasMore(page.pagination.hasMore)
   }
   useEffect(() => { cargar().catch(() => setItems([])).finally(() => setLoading(false)) }, [])

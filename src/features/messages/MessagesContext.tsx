@@ -1,88 +1,25 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Conversacion } from '@/types'
-import { CONVERSACIONES, RESPUESTAS_DEMO } from './data'
+import { useAuth } from '@/features/auth/AuthContext'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
+import type { ApiConversation, ApiDirectMessage } from '@/lib/api/helpwork.types'
 
-/* ------------------------------------------------------------------
-   Estado de la mensajería.
-
-   Vive en un contexto porque hay TRES lugares que necesitan lo mismo:
-   el icono de la barra (cuántos sin leer), el desplegable (la lista) y
-   las ventanitas de chat (los mensajes). Sin contexto habría que pasar
-   props por media aplicación.
-------------------------------------------------------------------- */
-
-interface MessagesContextValue {
-  conversaciones: Conversacion[]
-  totalNoLeidos: number
-  /** Ids de los chats abiertos abajo a la derecha (máximo 3 a la vez). */
-  abiertos: string[]
-  minimizados: string[]
-  abrirChat: (id: string) => void
-  cerrarChat: (id: string) => void
-  alternarMinimizado: (id: string) => void
-  enviar: (id: string, texto: string) => void
-}
-
-const MessagesContext = createContext<MessagesContextValue | null>(null)
-
-const MAX_ABIERTOS = 3
-const ahora = () => new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
+interface MessagesContextValue { conversaciones: Conversacion[]; totalNoLeidos: number; abiertos: string[]; minimizados: string[]; cargarChats: boolean; cargandoConversacion: string | null; abrirChat: (id: string) => void; verConversacion: (id: string) => void; cerrarChat: (id: string) => void; alternarMinimizado: (id: string) => void; enviar: (id: string, texto: string) => void; cargarAnteriores: (id: string) => void; hayMas: Record<string, boolean> }
+const MessagesContext = createContext<MessagesContextValue | null>(null); const MAX_ABIERTOS = 3
+const time = (iso: string) => new Intl.DateTimeFormat('es-EC', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+const uuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
-  const [conversaciones, setConversaciones] = useState<Conversacion[]>(CONVERSACIONES)
-  const [abiertos, setAbiertos] = useState<string[]>([])
-  const [minimizados, setMinimizados] = useState<string[]>([])
-
-  const abrirChat = useCallback((id: string) => {
-    // Al abrir se marca como leída: es lo que espera cualquiera
-    setConversaciones(cs => cs.map(c => (c.id === id ? { ...c, noLeidos: 0 } : c)))
-    setMinimizados(m => m.filter(x => x !== id))
-    setAbiertos(a => (a.includes(id) ? a : [id, ...a].slice(0, MAX_ABIERTOS)))
-  }, [])
-
-  const cerrarChat = useCallback((id: string) => {
-    setAbiertos(a => a.filter(x => x !== id))
-    setMinimizados(m => m.filter(x => x !== id))
-  }, [])
-
-  const alternarMinimizado = useCallback((id: string) => {
-    setMinimizados(m => (m.includes(id) ? m.filter(x => x !== id) : [...m, id]))
-  }, [])
-
-  const enviar = useCallback((id: string, texto: string) => {
-    const limpio = texto.trim()
-    if (!limpio) return
-
-    setConversaciones(cs => cs.map(c => c.id === id
-      ? { ...c, mensajes: [...c.mensajes, { id: `m${Date.now()}`, autor: 'yo', texto: limpio, hora: ahora() }] }
-      : c))
-
-    // Respuesta simulada, solo para que la maqueta se sienta viva.
-    // TODO backend: esto lo reemplaza un WebSocket o un polling.
-    const espera = 900 + Math.random() * 900
-    window.setTimeout(() => {
-      const respuesta = RESPUESTAS_DEMO[Math.floor(Math.random() * RESPUESTAS_DEMO.length)]
-      setConversaciones(cs => cs.map(c => c.id === id
-        ? { ...c, mensajes: [...c.mensajes, { id: `r${Date.now()}`, autor: 'otro', texto: respuesta, hora: ahora() }] }
-        : c))
-    }, espera)
-  }, [])
-
-  const totalNoLeidos = useMemo(
-    () => conversaciones.reduce((n, c) => n + c.noLeidos, 0),
-    [conversaciones],
-  )
-
-  const value = useMemo(
-    () => ({ conversaciones, totalNoLeidos, abiertos, minimizados, abrirChat, cerrarChat, alternarMinimizado, enviar }),
-    [conversaciones, totalNoLeidos, abiertos, minimizados, abrirChat, cerrarChat, alternarMinimizado, enviar],
-  )
-
+  const { usuario } = useAuth(); const [conversaciones, setConversaciones] = useState<Conversacion[]>([]); const [abiertos, setAbiertos] = useState<string[]>([]); const [minimizados, setMinimizados] = useState<string[]>([]); const [before, setBefore] = useState<Record<string, string | null>>({}); const [hayMas, setHayMas] = useState<Record<string, boolean>>({}); const [cargarChats, setCargarChats] = useState(true); const [cargandoConversacion, setCargandoConversacion] = useState<string | null>(null)
+  const loadConversations = useCallback(async () => { if (!usuario?.id) return; try { const rows = await http.get<ApiConversation[]>(ENDPOINTS.mensajes.conversations); setConversaciones(previous => rows.map(row => { const old = previous.find(item => item.id === row.id); const last = row.last_message; const lastMapped = last ? { id: last.id, autor: last.is_system ? 'sistema' as const : last.sender_id === usuario.id ? 'yo' as const : 'otro' as const, texto: last.body, hora: time(last.created_at) } : null; const messages = !old ? (lastMapped ? [lastMapped] : []) : (!lastMapped || old.mensajes.some(message => message.id === lastMapped.id) ? old.mensajes : [...old.mensajes, lastMapped]); return { id: row.id, nombre: row.counterpart?.full_name || 'Usuario', rol: 'Conversación privada', avatarUrl: row.counterpart?.avatar_url || '', enLinea: false, noLeidos: row.unread_count, sobre: row.provider_jobs?.service_requests?.description_free?.slice(0, 48), mensajes: messages } })) } finally { setCargarChats(false) } }, [usuario?.id])
+  const loadMessages = useCallback(async (id: string, older = false) => { if (!uuid(id)) return; const initialLoad = !older && before[id] === undefined; if (initialLoad) setCargandoConversacion(id); try { const page = await http.get<{ items: ApiDirectMessage[]; hasMore: boolean; nextBefore: string | null }>(ENDPOINTS.mensajes.messages(id, older ? before[id] ?? undefined : undefined)); const mapped = page.items.map(m => ({ id: m.id, autor: m.is_system ? 'sistema' as const : m.sender_id === usuario?.id ? 'yo' as const : 'otro' as const, texto: m.body, hora: time(m.created_at) })); setConversaciones(items => items.map(c => c.id !== id ? c : { ...c, noLeidos: 0, mensajes: older ? [...mapped, ...c.mensajes.filter(existing => !mapped.some(next => next.id === existing.id))] : mapped })); setBefore(value => ({ ...value, [id]: page.nextBefore })); setHayMas(value => ({ ...value, [id]: page.hasMore })) } finally { if (initialLoad) setCargandoConversacion(current => current === id ? null : current) } }, [before, usuario?.id])
+  useEffect(() => { setAbiertos([]); setMinimizados([]); setConversaciones([]); setBefore({}); setHayMas({}); setCargarChats(Boolean(usuario?.id)); setCargandoConversacion(null) }, [usuario?.id])
+  useEffect(() => { loadConversations().catch(() => undefined); const timer = window.setInterval(() => { loadConversations().catch(() => undefined); abiertos.forEach(id => loadMessages(id).catch(() => undefined)) }, 10000); return () => window.clearInterval(timer) }, [abiertos, loadConversations, loadMessages])
+  const verConversacion = useCallback((id: string) => { if (!uuid(id)) return; loadMessages(id).catch(() => undefined); loadConversations().catch(() => undefined) }, [loadConversations, loadMessages])
+  const abrirChat = useCallback((id: string) => { if (!uuid(id)) return; setMinimizados(items => items.filter(item => item !== id)); setAbiertos(items => items.includes(id) ? items : [id, ...items].slice(0, MAX_ABIERTOS)); verConversacion(id) }, [verConversacion])
+  const enviar = useCallback((id: string, texto: string) => { const body = texto.trim(); if (!body || body.length > 100) return; http.post<ApiDirectMessage>(ENDPOINTS.mensajes.messages(id), { body }).then(message => { setConversaciones(items => items.map(c => c.id === id ? { ...c, mensajes: [...c.mensajes, { id: message.id, autor: 'yo', texto: message.body, hora: time(message.created_at) }] } : c)); loadConversations().catch(() => undefined) }).catch(() => undefined) }, [loadConversations])
+  const value = useMemo(() => ({ conversaciones, totalNoLeidos: conversaciones.reduce((sum, item) => sum + item.noLeidos, 0), abiertos, minimizados, cargarChats, cargandoConversacion, abrirChat, verConversacion, cerrarChat: (id: string) => { setAbiertos(items => items.filter(item => item !== id)); setMinimizados(items => items.filter(item => item !== id)) }, alternarMinimizado: (id: string) => setMinimizados(items => items.includes(id) ? items.filter(item => item !== id) : [...items, id]), enviar, cargarAnteriores: (id: string) => { if (hayMas[id]) loadMessages(id, true).catch(() => undefined) }, hayMas }), [abiertos, abrirChat, cargarChats, cargandoConversacion, conversaciones, enviar, hayMas, loadMessages, minimizados, verConversacion])
   return <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
 }
-
-export function useMessages() {
-  const ctx = useContext(MessagesContext)
-  if (!ctx) throw new Error('useMessages debe usarse dentro de <MessagesProvider>')
-  return ctx
-}
+export function useMessages() { const ctx = useContext(MessagesContext); if (!ctx) throw new Error('useMessages debe usarse dentro de <MessagesProvider>'); return ctx }

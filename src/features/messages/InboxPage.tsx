@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Send, Smile, Phone, Video, Info, ArrowLeft } from 'lucide-react'
+import { Search, Send, Smile, Phone, Video, Info, ArrowLeft, LoaderCircle } from 'lucide-react'
 import { useMessages } from './MessagesContext'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -14,24 +15,38 @@ import { cn } from '@/lib/cn'
  * En móvil se muestra una u otra, nunca las dos.
  */
 export default function InboxPage() {
-  const { conversaciones, abrirChat, enviar } = useMessages()
+  const { conversaciones, verConversacion, enviar, cargarAnteriores, hayMas, cargarChats, cargandoConversacion } = useMessages()
   const { usuario } = useAuth()
+  const { state } = useLocation() as { state?: { conversationId?: string } }
   const otros = contraparte(usuario?.rol === 'helpworker' ? 'helpworker' : 'solicitante')
-  const [activa, setActiva] = useState<string | null>(conversaciones[0]?.id ?? null)
+  // Siempre iniciar sin conversación: al montar la página se carga el primer lote real,
+  // incluso si el contexto ya había traído la vista previa desde otra ruta.
+  const [activa, setActiva] = useState<string | null>(state?.conversationId ?? null)
   const [busqueda, setBusqueda] = useState('')
   const [texto, setTexto] = useState('')
 
   const conv = conversaciones.find(c => c.id === activa)
   const filtradas = conversaciones.filter(c => c.nombre.toLowerCase().includes(busqueda.toLowerCase()))
 
-  const seleccionar = (id: string) => { setActiva(id); abrirChat(id) }
+  useEffect(() => {
+    if (!activa && conversaciones[0]) {
+      setActiva(conversaciones[0].id)
+      verConversacion(conversaciones[0].id)
+    }
+  }, [activa, conversaciones, verConversacion])
+  useEffect(() => { if (state?.conversationId) { setActiva(state.conversationId); verConversacion(state.conversationId) } }, [state?.conversationId, verConversacion])
+
+  // Si esta conversación está abierta, el mismo sondeo trae el mensaje y lo marca leído.
+  useEffect(() => { if (!activa) return; const timer = window.setInterval(() => verConversacion(activa), 10000); return () => window.clearInterval(timer) }, [activa, verConversacion])
+
+  const seleccionar = (id: string) => { setActiva(id); verConversacion(id) }
   const mandar = () => { if (conv) { enviar(conv.id, texto); setTexto('') } }
 
   return (
     <div>
       <PageHeader
         titulo="Mensajes"
-        descripcion={`Tus conversaciones con ${otros.plural}.`}
+        descripcion={usuario?.roles.includes('solicitante') && usuario?.roles.includes('helpworker') ? 'Tus conversaciones privadas como HelpWorker y HelpSeeker.' : `Tus conversaciones con ${otros.plural}.`}
       />
 
       <div className="panel grid h-[calc(100vh-230px)] min-h-[520px] overflow-hidden md:grid-cols-[320px_1fr]">
@@ -49,7 +64,7 @@ export default function InboxPage() {
           </div>
 
           <ul className="flex-1 overflow-y-auto p-2">
-            {filtradas.map(c => {
+            {cargarChats ? <li className="grid min-h-36 place-items-center text-brand-600"><LoaderCircle className="animate-spin" size={22} /></li> : filtradas.map(c => {
               const ultimo = c.mensajes[c.mensajes.length - 1]
               return (
                 <li key={c.id}>
@@ -67,11 +82,11 @@ export default function InboxPage() {
                     <div className="min-w-0 flex-1">
                       <p className={cn('truncate text-[14.5px]', c.noLeidos ? 'font-bold' : 'font-semibold')}>{c.nombre}</p>
                       <p className={cn('truncate text-[12.5px]', c.noLeidos ? 'font-medium text-ink' : 'texto-suave')}>
-                        {ultimo.autor === 'yo' && 'Tú: '}{ultimo.texto}
+                        {ultimo ? <>{ultimo.autor === 'yo' && 'Tú: '}{ultimo.texto}</> : 'Sin mensajes aún'}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-[11px] text-ink-muted">{ultimo.hora}</span>
+                      <span className="text-[11px] text-ink-muted">{ultimo?.hora ?? ''}</span>
                       {c.noLeidos > 0 && (
                         <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-brand-600 px-1 text-[11px] font-bold text-white">
                           {c.noLeidos}
@@ -87,7 +102,7 @@ export default function InboxPage() {
         </aside>
 
         {/* ---- Conversación ---- */}
-        <section className={cn('flex flex-col', !activa && 'hidden md:flex')}>
+        <section className={cn('flex min-h-0 flex-col', !activa && 'hidden md:flex')}>
           {conv ? (
             <>
               <header className="flex items-center gap-3 border-b border-white/60 bg-white/50 px-4 py-3">
@@ -108,9 +123,12 @@ export default function InboxPage() {
                 ))}
               </header>
 
-              <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto px-5 py-4">
+              <div className="relative flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-5 py-4">
+                {cargandoConversacion === conv.id && <div className="absolute inset-0 z-10 grid place-items-center bg-white/60 text-brand-600 backdrop-blur-[1px]"><div className="flex flex-col items-center gap-2 text-[12px] font-semibold"><LoaderCircle className="animate-spin" size={25} />Cargando mensajes…</div></div>}
+                {hayMas[conv.id] && <button onClick={() => cargarAnteriores(conv.id)} className="mx-auto mb-3 inline-flex items-center gap-1 text-[12px] font-semibold text-brand-600"><LoaderCircle size={13} /> Cargar mensajes anteriores</button>}
                 <AnimatePresence initial={false}>
                   {conv.mensajes.map((m, i) => {
+                    if (m.autor === 'sistema') return <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mx-auto my-3 max-w-md rounded-xl border border-brand-100 bg-brand-50/75 px-3 py-2 text-center text-[12px] leading-relaxed text-ink-soft">{m.texto}</motion.div>
                     const mio = m.autor === 'yo'
                     const seguido = i > 0 && conv.mensajes[i - 1].autor === m.autor
                     return (
@@ -142,11 +160,11 @@ export default function InboxPage() {
                 </button>
                 <input
                   value={texto} onChange={e => setTexto(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') mandar() }}
+                  maxLength={100} onKeyDown={e => { if (e.key === 'Enter') mandar() }}
                   placeholder="Escribe un mensaje..."
                   className="min-w-0 flex-1 rounded-full bg-black/[.04] px-4 py-2.5 text-[14px] outline-none transition focus:bg-black/[.06] placeholder:text-ink-muted/80"
                 />
-                <button
+                <span className="hidden text-[11px] text-ink-muted sm:inline">{texto.length}/100</span><button
                   onClick={mandar} disabled={!texto.trim()} aria-label="Enviar"
                   className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-600 text-white transition hover:bg-brand-500 disabled:opacity-40"
                 >

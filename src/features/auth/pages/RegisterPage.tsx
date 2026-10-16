@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Input } from '@/components/ui/Input'
@@ -12,13 +12,15 @@ import { useAuth } from '../AuthContext'
 import { GoogleSignIn } from '../GoogleSignIn'
 import type { UserRole } from '@/types'
 import { MascotGuideButton } from '@/components/onboarding/MascotGuideButton'
+import { http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
 
 const PASOS = ['Cuenta', 'Detalles', 'Confirmar'] as const
 
 export default function RegisterPage() {
   const [paso, setPaso] = useState(0)
   const [acepta, setAcepta] = useState(false)
-  const [datos, setDatos] = useState({ nombre: '', email: '', password: '', confirmarPassword: '' })
+  const [datos, setDatos] = useState({ nombre: '', email: '', password: '', confirmarPassword: '', city: '', university: '' })
   const navigate = useNavigate()
   const { registrar } = useAuth()
   useAutoTour('registro')
@@ -29,13 +31,16 @@ export default function RegisterPage() {
 
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [terminosOpen, setTerminosOpen] = useState(false)
+  const [terminos, setTerminos] = useState<{ title: string; body: string } | null>(null)
+  useEffect(() => { http.get<Array<{ title: string; body: string }>>(ENDPOINTS.contenido.publico('terms_conditions')).then(items => setTerminos(items[0] ?? null)).catch(() => undefined) }, [])
   const siguiente = async (e: React.FormEvent) => {
     e.preventDefault()
     if (paso < PASOS.length - 1) { setPaso(p => p + 1); return }
     if (datos.password !== datos.confirmarPassword) { setPaso(0); setError('Las contraseñas no coinciden.'); return }
     setError(''); setEnviando(true)
     try {
-      const result = await registrar({ nombre: datos.nombre, email: datos.email, password: datos.password, rol })
+      const result = await registrar({ nombre: datos.nombre, email: datos.email, password: datos.password, rol, city: datos.city, university: datos.university, termsAccepted: acepta })
       if (result.emailConfirmationRequired) { setError('Revisa tu correo y confirma la cuenta antes de iniciar sesión.'); setPaso(0); return }
       navigate(result.sesion?.rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante, { replace: true })
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo crear la cuenta.'); setPaso(0) } finally { setEnviando(false) }
@@ -109,7 +114,7 @@ export default function RegisterPage() {
                 className="mt-0.5 h-4 w-4 rounded border-surface-line accent-brand-600"
               />
               <span>
-                Acepto los <a href="#" className="font-medium text-brand-600 hover:underline">Términos y Condiciones</a>
+                Acepto los <button type="button" onClick={() => setTerminosOpen(true)} className="font-medium text-brand-600 hover:underline">Términos y Condiciones</button>
                 {' '}y la <a href="#" className="font-medium text-brand-600 hover:underline">Política de Privacidad</a>
               </span>
             </label>
@@ -118,7 +123,8 @@ export default function RegisterPage() {
 
         {paso === 1 && (
           <>
-            <Input label="Ciudad" placeholder="Loja, Ecuador" />
+            <Input label="Ciudad" placeholder="Loja, Ecuador" value={datos.city} onChange={e => setDatos({ ...datos, city: e.target.value })} />
+            <Input label="Universidad o institución" placeholder="Ej. Universidad Nacional de Loja" value={datos.university} onChange={e => setDatos({ ...datos, university: e.target.value })} />
             <Input label="Área principal" placeholder="Ej. Matemáticas, Diseño, Marketing" />
             <Input label="Teléfono (opcional)" placeholder="+593 ..." />
           </>
@@ -145,6 +151,7 @@ export default function RegisterPage() {
       </p>
 
       <MascotGuideButton tourId="registro" />
+      {terminosOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/35 p-5 backdrop-blur-sm"><article className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><h2 className="text-xl font-bold">{terminos?.title ?? 'Términos y condiciones'}</h2><button type="button" onClick={() => setTerminosOpen(false)} className="text-ink-muted">Cerrar</button></div><div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-ink-soft">{terminos?.body ?? 'Los términos y condiciones estarán disponibles próximamente.'}</div></article></div>}
     </AuthShell>
   )
 }

@@ -8,9 +8,11 @@ import { Logo } from '@/components/layout/Logo'
 import { useTour } from '@/components/onboarding/TourProvider'
 import { LOGIN_TOUR } from '@/components/onboarding/tours'
 import { MascotGuideButton } from '@/components/onboarding/MascotGuideButton'
-import { ROUTES } from '@/config/site.config'
+import { dashboardRouteForRole, ROUTES } from '@/config/site.config'
 import { useAuth } from '../AuthContext'
 import { GoogleSignIn } from '../GoogleSignIn'
+import { ApiError, http } from '@/lib/api/http'
+import { ENDPOINTS } from '@/lib/api/endpoints'
 
 /**
  * Pantalla de inicio de sesión.
@@ -22,10 +24,12 @@ export default function LoginPage() {
   const { start } = useTour()
   const { state } = useLocation() as { state?: { startTour?: boolean } }
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, refrescarSesion } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [mfaFactorId, setMfaFactorId] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
 
   useEffect(() => {
     if (state?.startTour) {
@@ -39,8 +43,19 @@ export default function LoginPage() {
     setError(''); setEnviando(true)
     try {
       const sesion = await login(form)
-      navigate(sesion.rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo iniciar sesión.') } finally { setEnviando(false) }
+      navigate(dashboardRouteForRole(sesion.rol))
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 428 && (cause.data as any)?.mfaRequired) {
+        setMfaFactorId(String((cause.data as any).factorId ?? '')); setError('Introduce el código de tu aplicación autenticadora.');
+      } else setError(cause instanceof Error ? cause.message : 'No se pudo iniciar sesión.')
+    } finally { setEnviando(false) }
+  }
+
+  const onVerifyMfa = async (event: React.FormEvent) => {
+    event.preventDefault(); setEnviando(true); setError('')
+    try { await http.post(ENDPOINTS.auth.mfaVerify, { factorId: mfaFactorId, code: mfaCode }); const sesion = await refrescarSesion(); if (sesion) navigate(dashboardRouteForRole(sesion.rol)) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Código MFA no válido.') }
+    finally { setEnviando(false) }
   }
 
   return (
@@ -53,7 +68,7 @@ export default function LoginPage() {
 
       <GoogleSignIn
         data-tour="login-google"
-        onListo={rol => navigate(rol === 'helpworker' ? ROUTES.appHelpWorker : ROUTES.appSolicitante)}
+        onListo={rol => navigate(dashboardRouteForRole(rol))}
       />
 
       <div className="my-6 flex items-center gap-4">
@@ -62,7 +77,7 @@ export default function LoginPage() {
         <span className="h-px flex-1 bg-surface-line" />
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      {mfaFactorId ? <form onSubmit={onVerifyMfa} className="space-y-4"><p className="rounded-xl bg-brand-50 p-3 text-sm text-brand-800">Tu cuenta administrativa tiene MFA activado. Abre tu aplicación autenticadora y escribe el código actual.</p><Input label="Código MFA" inputMode="numeric" maxLength={6} value={mfaCode} onChange={event => setMfaCode(event.target.value.replace(/\D/g, ''))} placeholder="000000" required /><Button type="submit" size="lg" fullWidth disabled={enviando || mfaCode.length !== 6}>{enviando ? 'Verificando…' : 'Verificar MFA'}</Button>{error && <p className="text-center text-[13px] text-red-600">{error}</p>}</form> : <form onSubmit={onSubmit} className="space-y-4">
         <div data-tour="login-email">
           <Input
             label="Correo electrónico" type="email" placeholder="tu.correo@ejemplo.com" required
@@ -84,7 +99,7 @@ export default function LoginPage() {
           <Button type="submit" size="lg" fullWidth disabled={enviando}>{enviando ? 'Ingresando…' : 'Iniciar sesión'}</Button>
         </div>
         {error && <p className="text-center text-[13px] text-red-600">{error}</p>}
-      </form>
+      </form>}
 
       <p data-tour="login-register" className="mt-6 text-center text-[14.5px] text-ink-soft">
         ¿No tienes cuenta?{' '}
